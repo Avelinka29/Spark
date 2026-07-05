@@ -50,7 +50,8 @@ struct CreateProjectView: View {
         "UI/UX Designer",
         "ML",
         "QA",
-        "Project Manager"
+        "Project Manager",
+        "Data Scientist",
         
     ]
     
