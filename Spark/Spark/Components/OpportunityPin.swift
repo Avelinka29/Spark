@@ -8,11 +8,23 @@
 import SwiftUI
 
 struct OpportunityPin: View {
+    
+    let color: SparkColor
+    
     var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
+        Circle()
+            .fill(color.color)
+            .frame(width: 55, height: 55)
+            .overlay {
+                Image(systemName: "scope")
+                    .font(.system(size: 22))
+                    .foregroundStyle(.white)
+            }.shadow(radius: 8)
+        
     }
+             
 }
 
 #Preview {
-    OpportunityPin()
+    OpportunityPin(color: .pink)
 }

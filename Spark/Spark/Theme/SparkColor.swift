@@ -17,6 +17,7 @@ import SwiftUI
         case yellow
         case pink
         case blue
+        case green
         
         var color: Color {
             switch self {
@@ -36,7 +37,8 @@ import SwiftUI
                 return .primaryPink
             case .blue:
                 return .primaryBlue
-
+            case .green:
+                return .primaryGreen
             
             }
         }

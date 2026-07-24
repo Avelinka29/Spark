@@ -8,7 +8,7 @@
 import SwiftUI
 import MapKit
 
-let mockOpportunity = [
+let mockOpportunities = [
     
     Opportunity(
             title: "AI Hackathon Sber",
@@ -19,7 +19,8 @@ let mockOpportunity = [
                 longitude: 27.5619
             ),
             address: "Минск",
-            color: .primaryLitePurple
+            color: .litePurple
+            
         ),
 
         Opportunity(
@@ -31,7 +32,8 @@ let mockOpportunity = [
                 longitude: 27.5670
             ),
             address: "Минск",
-            color: .primaryGreen
+            color: .green
+            
         ),
 
         Opportunity(
@@ -43,7 +45,8 @@ let mockOpportunity = [
                 longitude: 27.5490
             ),
             address: "Минск",
-            color: .primaryYellow
+            color: .yellow
+           
         )
     
     

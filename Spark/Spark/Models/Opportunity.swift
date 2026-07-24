@@ -5,18 +5,23 @@
 //  Created by Avelina Maksimchik on 08.07.2026.
 //
 
-import Foundation
 import MapKit
 import SwiftUI
 
-struct Place: Identifiable {
-    let id: UUID = UUID()
+struct Opportunity: Identifiable {
+
+    let id = UUID()
+
     let title: String
-    let category: String
-    let placemark: MKPlacemark
-    let color: Color
+    let description: String
+    let category: EventCategory
+
     let coordinate: CLLocationCoordinate2D
     let address: String
+
+    let color: SparkColor
+    
+    
 }
 
 
