@@ -7,12 +7,13 @@
 
 import SwiftUI
 
-struct Vacancy: View {
-    var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
-    }
+struct Vacancy: Identifiable {
+    let id = UUID()
+    let title: String
+    let imageName: String
+    let status: String
+    let roleDescription: String
+    let isActive: Bool
 }
 
-#Preview {
-    Vacancy()
-}
+

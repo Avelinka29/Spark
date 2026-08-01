@@ -9,10 +9,29 @@ import SwiftUI
 
 struct ProfileView: View {
     var body: some View {
-        Text("Профиль")
-    }
-}
-
+        
+        
+        NavigationStack {
+            
+            ZStack(alignment: .top){
+                
+                ProfileHeader()
+                    .zIndex(1)
+                   
+                
+                ScrollView {
+                    VStack(spacing: 20){
+                        
+                        
+                        //ProfileContent()
+                    }
+                }
+            }
+            .ignoresSafeArea(edges: .top)
+        }
+        
+        
+    }}
 #Preview {
     ProfileView()
 }

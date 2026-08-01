@@ -75,7 +75,7 @@ struct PreviewEventMap: View {
                     
                     
                 
-            }
+            }.fixedSize(horizontal: true, vertical: false)
             
             
             
@@ -97,5 +97,4 @@ struct PreviewEventMap: View {
 }
 
 
-//.background(Color.primaryGrey1.opacity(0.3))
-//.background(.ultraThinMaterial)
+
