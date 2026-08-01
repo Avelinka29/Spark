@@ -9,4 +9,6 @@ import SwiftUI
 
 struct AvatarImage {
     var image: UIImage?
+    
+    //дополнить потом
 }
