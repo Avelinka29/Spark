@@ -24,6 +24,7 @@ def test_full_user_scenario() -> None:
             opportunities = client.get("/api/v1/opportunities")
             assert opportunities.status_code == 200
             assert len(opportunities.json()) >= 4
+            opportunity_id = opportunities.json()[0]["id"]
 
             registration = client.post(
                 "/api/v1/auth/register",
@@ -36,6 +37,22 @@ def test_full_user_scenario() -> None:
             profile = client.get("/api/v1/profile/me", headers=headers)
             assert profile.status_code == 200
             assert profile.json()["email"] == email
+
+            bookmark = client.post(
+                f"/api/v1/opportunities/{opportunity_id}/bookmark",
+                headers=headers,
+            )
+            assert bookmark.status_code == 204
+
+            bookmarks = client.get("/api/v1/bookmarks", headers=headers)
+            assert bookmarks.status_code == 200
+            assert opportunity_id in {item["id"] for item in bookmarks.json()}
+
+            removed_bookmark = client.delete(
+                f"/api/v1/opportunities/{opportunity_id}/bookmark",
+                headers=headers,
+            )
+            assert removed_bookmark.status_code == 204
 
             created = client.post(
                 "/api/v1/projects",

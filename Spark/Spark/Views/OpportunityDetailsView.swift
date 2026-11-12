@@ -2,9 +2,11 @@ import SwiftUI
 
 struct OpportunityDetailsView: View {
     let opportunity: Opportunity
-    let isAuthenticated: Bool
+    let accessToken: String?
 
     @State private var isSaved = false
+    @State private var isBookmarkLoading = false
+    @State private var bookmarkError: String?
     @State private var hasApplied = false
     @State private var showAuthenticationRequired = false
 
@@ -38,7 +40,13 @@ struct OpportunityDetailsView: View {
 
                 HStack(spacing: 12) {
                     Button {
-                        isSaved.toggle()
+                        if accessToken == nil {
+                            showAuthenticationRequired = true
+                        } else {
+                            Task {
+                                await toggleBookmark()
+                            }
+                        }
                     } label: {
                         Label(
                             isSaved ? "Сохранено" : "Сохранить",
@@ -48,9 +56,10 @@ struct OpportunityDetailsView: View {
                     }
                     .buttonStyle(.bordered)
                     .tint(.primaryLitePurple)
+                    .disabled(isBookmarkLoading)
 
                     Button {
-                        if isAuthenticated {
+                        if accessToken != nil {
                             hasApplied = true
                         } else {
                             showAuthenticationRequired = true
@@ -69,10 +78,60 @@ struct OpportunityDetailsView: View {
         }
         .navigationTitle("Возможность")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: opportunity.id) {
+            await loadBookmarkState()
+        }
         .alert("Нужна авторизация", isPresented: $showAuthenticationRequired) {
             Button("Понятно", role: .cancel) {}
         } message: {
-            Text("Войдите в аккаунт, чтобы подать заявку.")
+            Text("Войдите в аккаунт, чтобы сохранять возможности и подавать заявки.")
+        }
+        .alert("Не удалось сохранить", isPresented: Binding(
+            get: { bookmarkError != nil },
+            set: { if !$0 { bookmarkError = nil } }
+        )) {
+            Button("Понятно", role: .cancel) {}
+        } message: {
+            Text(bookmarkError ?? "Неизвестная ошибка")
+        }
+    }
+
+    private func loadBookmarkState() async {
+        guard let accessToken else {
+            isSaved = false
+            return
+        }
+
+        do {
+            let bookmarks: [OpportunityDTO] = try await APIClient.shared.send(
+                path: "bookmarks",
+                token: accessToken
+            )
+            isSaved = bookmarks.contains { $0.id == opportunity.id }
+        } catch {
+            bookmarkError = error.localizedDescription
+        }
+    }
+
+    private func toggleBookmark() async {
+        guard let accessToken else {
+            showAuthenticationRequired = true
+            return
+        }
+
+        isBookmarkLoading = true
+        defer { isBookmarkLoading = false }
+
+        do {
+            let method = isSaved ? "DELETE" : "POST"
+            let _: EmptyResponse = try await APIClient.shared.send(
+                path: "opportunities/\(opportunity.id)/bookmark",
+                method: method,
+                token: accessToken
+            )
+            isSaved.toggle()
+        } catch {
+            bookmarkError = error.localizedDescription
         }
     }
 }
@@ -167,6 +226,6 @@ private struct OpportunityFactsSection: View {
 
 #Preview {
     NavigationStack {
-        OpportunityDetailsView(opportunity: mockOpportunities[0], isAuthenticated: false)
+        OpportunityDetailsView(opportunity: mockOpportunities[0], accessToken: nil)
     }
 }

@@ -33,7 +33,7 @@ struct MainTabView: View {
         ZStack {
             TabView(selection: $selectedTab) {
                 HomeView(
-                    isAuthenticated: accessToken != nil,
+                    accessToken: accessToken,
                     avatarImage: profileStore.avatarImage,
                     profileName: profileStore.profile?.name,
                     onAvatarTap: {
@@ -49,7 +49,7 @@ struct MainTabView: View {
                     }
                     .tag(0)
 
-                MapView(isAuthenticated: accessToken != nil)
+                MapView(accessToken: accessToken)
                     .tabItem {
                         Label("Карта", systemImage: "map")
                     }

@@ -2,7 +2,7 @@ import MapKit
 import SwiftUI
 
 struct MapView: View {
-    let isAuthenticated: Bool
+    let accessToken: String?
 
     @State private var model = MapViewModel()
     @State private var presentedOpportunity: Opportunity?
@@ -95,7 +95,7 @@ struct MapView: View {
             NavigationStack {
                 OpportunityDetailsView(
                     opportunity: opportunity,
-                    isAuthenticated: isAuthenticated
+                    accessToken: accessToken
                 )
             }
         }
@@ -125,5 +125,5 @@ private struct MapLoadingErrorView: View {
 }
 
 #Preview {
-    MapView(isAuthenticated: false)
+    MapView(accessToken: nil)
 }

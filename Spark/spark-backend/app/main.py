@@ -158,6 +158,20 @@ async def opportunity_details(opportunity_id: uuid.UUID, session: AsyncSession =
     return opportunity
 
 
+@app.get("/api/v1/bookmarks", response_model=list[OpportunityResponse])
+async def list_bookmarks(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[Opportunity]:
+    query = (
+        select(Opportunity)
+        .join(Bookmark, Bookmark.opportunity_id == Opportunity.id)
+        .where(Bookmark.user_id == user.id, Opportunity.published.is_(True))
+        .order_by(Opportunity.deadline.asc())
+    )
+    return list((await session.scalars(query)).all())
+
+
 @app.post("/api/v1/opportunities/{opportunity_id}/bookmark", status_code=status.HTTP_204_NO_CONTENT)
 async def bookmark(
     opportunity_id: uuid.UUID,
@@ -169,6 +183,23 @@ async def bookmark(
     existing = await session.scalar(select(Bookmark).where(Bookmark.user_id == user.id, Bookmark.opportunity_id == opportunity_id))
     if existing is None:
         session.add(Bookmark(user_id=user.id, opportunity_id=opportunity_id))
+        await session.commit()
+
+
+@app.delete("/api/v1/opportunities/{opportunity_id}/bookmark", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_bookmark(
+    opportunity_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    existing = await session.scalar(
+        select(Bookmark).where(
+            Bookmark.user_id == user.id,
+            Bookmark.opportunity_id == opportunity_id,
+        )
+    )
+    if existing is not None:
+        await session.delete(existing)
         await session.commit()
 
 

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct HomeView: View {
-    let isAuthenticated: Bool
+    let accessToken: String?
     let avatarImage: UIImage?
     let profileName: String?
     let onAvatarTap: () -> Void
@@ -14,7 +14,7 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 HomeHeader(
-                    isAuthenticated: isAuthenticated,
+                    isAuthenticated: accessToken != nil,
                     avatarImage: avatarImage,
                     profileName: profileName,
                     onTap: onAvatarTap
@@ -36,7 +36,7 @@ struct HomeView: View {
                                 NavigationLink {
                                     OpportunityDetailsView(
                                         opportunity: opportunity,
-                                        isAuthenticated: isAuthenticated
+                                        accessToken: accessToken
                                     )
                                 } label: {
                                     EventCard(
@@ -174,7 +174,7 @@ private struct OpportunityFilters: View {
 
 #Preview {
     HomeView(
-        isAuthenticated: false,
+        accessToken: nil,
         avatarImage: nil,
         profileName: nil,
         onAvatarTap: {}
