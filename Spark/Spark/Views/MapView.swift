@@ -41,6 +41,29 @@ struct MapView: View {
 
                 Spacer()
 
+                if model.isLoading {
+                    ProgressView("Загружаем возможности…")
+                        .padding()
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 20)
+                } else if let errorMessage = model.errorMessage {
+                    MapLoadingErrorView(message: errorMessage) {
+                        Task {
+                            await model.load()
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                } else if model.visibleOpportunities.isEmpty {
+                    Text("На карте пока нет подходящих возможностей.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .padding()
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 20)
+                }
+
                 if let opportunity = model.selectedOpportunity,
                    let coordinate = opportunity.coordinate {
                     PreviewEventMap(
@@ -76,6 +99,28 @@ struct MapView: View {
                 )
             }
         }
+        .task {
+            await model.load()
+        }
+    }
+}
+
+private struct MapLoadingErrorView: View {
+    let message: String
+    let retry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text(message)
+                .font(.callout)
+                .multilineTextAlignment(.center)
+            Button("Повторить", action: retry)
+                .buttonStyle(.borderedProminent)
+                .tint(.primaryLitePurple)
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 }
 

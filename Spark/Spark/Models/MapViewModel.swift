@@ -21,19 +21,42 @@ final class MapViewModel: NSObject, @preconcurrency CLLocationManagerDelegate {
     var selectedOpportunity: Opportunity?
 
     private(set) var visibleOpportunities: [Opportunity]
+    private(set) var isLoading = false
+    private(set) var errorMessage: String?
 
     @ObservationIgnored
     private let locationManager = CLLocationManager()
 
-    private let opportunities: [Opportunity]
+    private var opportunities: [Opportunity]
 
     override init() {
-        opportunities = mockOpportunities.filter { $0.coordinate != nil }
-        visibleOpportunities = opportunities
+        opportunities = []
+        visibleOpportunities = []
         super.init()
 
         locationManager.delegate = self
         checkLocationAvailability()
+    }
+
+    func load() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let response: [OpportunityDTO] = try await APIClient.shared.send(
+                path: "opportunities"
+            )
+            opportunities = response
+                .map { $0.makeOpportunity() }
+                .filter { $0.coordinate != nil }
+            updateVisibleOpportunities()
+        } catch {
+            opportunities = []
+            visibleOpportunities = []
+            selectedOpportunity = nil
+            errorMessage = "Не удалось загрузить возможности для карты."
+        }
     }
 
     var opportunitiesCount: Int {
