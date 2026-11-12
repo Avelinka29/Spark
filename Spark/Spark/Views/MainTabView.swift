@@ -55,7 +55,10 @@ struct MainTabView: View {
                     }
                     .tag(1)
 
-                ProjectView(store: projectStore)
+                ProjectView(
+                    store: projectStore,
+                    currentUserID: profileStore.profile?.id
+                )
                     .tabItem {
                         Label("Проекты", systemImage: "folder")
                     }

@@ -4,21 +4,24 @@ from fastapi import Depends, FastAPI, HTTPException, Query, status
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
 
 from .config import get_settings
 from .database import get_session
-from .models import Application, Bookmark, Opportunity, Project, ProjectRole, User
+from .models import Application, ApplicationStatus, Bookmark, Opportunity, Project, ProjectRole, User
 from .schemas import (
     LoginRequest,
+    ApplicationResponse,
+    ApplicationStatusUpdate,
     GoogleAuthRequest,
     OpportunityResponse,
     ProfileResponse,
     ProjectCreate,
     ProjectResponse,
+    ProjectUpdate,
     RegisterRequest,
     TokenResponse,
 )
@@ -229,6 +232,41 @@ async def create_project(
     return (await session.scalars(query)).one()
 
 
+@app.patch("/api/v1/projects/{project_id}", response_model=ProjectResponse)
+async def update_project(
+    project_id: uuid.UUID,
+    payload: ProjectUpdate,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Project:
+    project = await session.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the project owner can edit it")
+
+    for field, value in payload.model_dump(exclude_none=True).items():
+        setattr(project, field, value)
+    await session.commit()
+    query = select(Project).options(selectinload(Project.roles)).where(Project.id == project.id)
+    return (await session.scalars(query)).one()
+
+
+@app.delete("/api/v1/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_project(
+    project_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    project = await session.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the project owner can delete it")
+    await session.delete(project)
+    await session.commit()
+
+
 @app.post("/api/v1/project-roles/{role_id}/applications", status_code=status.HTTP_201_CREATED)
 async def apply_to_role(
     role_id: uuid.UUID,
@@ -246,6 +284,109 @@ async def apply_to_role(
     await session.commit()
     await session.refresh(application)
     return {"id": application.id}
+
+
+def application_response(
+    application: Application,
+    applicant: User,
+    role: ProjectRole,
+    project: Project,
+) -> ApplicationResponse:
+    return ApplicationResponse(
+        id=application.id,
+        user_id=applicant.id,
+        user_name=applicant.name,
+        role_id=role.id,
+        role_title=role.title,
+        project_id=project.id,
+        project_title=project.title,
+        status=application.status.value,
+    )
+
+
+@app.get("/api/v1/applications/mine", response_model=list[ApplicationResponse])
+async def my_applications(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ApplicationResponse]:
+    query = (
+        select(Application, User, ProjectRole, Project)
+        .join(User, User.id == Application.user_id)
+        .join(ProjectRole, ProjectRole.id == Application.project_role_id)
+        .join(Project, Project.id == ProjectRole.project_id)
+        .where(Application.user_id == user.id)
+    )
+    rows = (await session.execute(query)).all()
+    return [application_response(*row) for row in rows]
+
+
+@app.get("/api/v1/applications/received", response_model=list[ApplicationResponse])
+async def received_applications(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ApplicationResponse]:
+    query = (
+        select(Application, User, ProjectRole, Project)
+        .join(User, User.id == Application.user_id)
+        .join(ProjectRole, ProjectRole.id == Application.project_role_id)
+        .join(Project, Project.id == ProjectRole.project_id)
+        .where(Project.owner_id == user.id)
+    )
+    rows = (await session.execute(query)).all()
+    return [application_response(*row) for row in rows]
+
+
+@app.patch("/api/v1/applications/{application_id}", response_model=ApplicationResponse)
+async def decide_application(
+    application_id: uuid.UUID,
+    payload: ApplicationStatusUpdate,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ApplicationResponse:
+    query = (
+        select(Application, User, ProjectRole, Project)
+        .join(User, User.id == Application.user_id)
+        .join(ProjectRole, ProjectRole.id == Application.project_role_id)
+        .join(Project, Project.id == ProjectRole.project_id)
+        .where(Application.id == application_id)
+    )
+    row = (await session.execute(query)).one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+    application, applicant, role, project = row
+    if project.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the project owner can decide applications")
+
+    application.status = ApplicationStatus(payload.status)
+    if payload.status == "accepted":
+        role.is_open = False
+        await session.execute(
+            update(Application)
+            .where(
+                Application.project_role_id == role.id,
+                Application.id != application.id,
+            )
+            .values(status=ApplicationStatus.rejected)
+        )
+    await session.commit()
+    return application_response(application, applicant, role, project)
+
+
+@app.delete("/api/v1/applications/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_application(
+    application_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    application = await session.get(Application, application_id)
+    if application is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+    if application.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the applicant can cancel it")
+    if application.status.value == "accepted":
+        raise HTTPException(status_code=409, detail="Accepted application cannot be cancelled")
+    await session.delete(application)
+    await session.commit()
 
 
 @app.get("/api/v1/profile/me", response_model=ProfileResponse)

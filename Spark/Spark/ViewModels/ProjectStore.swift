@@ -7,6 +7,8 @@ final class ProjectStore {
     private(set) var projects: [Project]
     private(set) var isLoading = false
     private(set) var errorMessage: String?
+    private(set) var myApplications: [ProjectApplicationDTO] = []
+    private(set) var receivedApplications: [ProjectApplicationDTO] = []
 
     private let token: String?
 
@@ -31,6 +33,18 @@ final class ProjectStore {
         do {
             let response: [ProjectDTO] = try await APIClient.shared.send(path: "projects")
             projects = response.map { $0.makeProject() }
+            if token != nil {
+                async let mine: [ProjectApplicationDTO] = APIClient.shared.send(
+                    path: "applications/mine",
+                    token: token
+                )
+                async let received: [ProjectApplicationDTO] = APIClient.shared.send(
+                    path: "applications/received",
+                    token: token
+                )
+                myApplications = try await mine
+                receivedApplications = try await received
+            }
         } catch {
             errorMessage = "Сервер проектов недоступен."
         }
@@ -95,8 +109,55 @@ final class ProjectStore {
 
             projects[projectIndex].vacancies[vacancyIndex].isActive = false
             projects[projectIndex].vacancies[vacancyIndex].status = "ЗАЯВКА"
+            await load()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func decideApplication(id: UUID, accept: Bool) async {
+        guard let token else { return }
+        do {
+            let _: ProjectApplicationDTO = try await APIClient.shared.send(
+                path: "applications/\(id)",
+                method: "PATCH",
+                body: ApplicationStatusRequest(status: accept ? "accepted" : "rejected"),
+                token: token
+            )
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func cancelApplication(id: UUID) async {
+        guard let token else { return }
+        do {
+            let _: EmptyResponse = try await APIClient.shared.send(
+                path: "applications/\(id)",
+                method: "DELETE",
+                token: token
+            )
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteProject(id: UUID) async -> Bool {
+        guard let token else { return false }
+        do {
+            let _: EmptyResponse = try await APIClient.shared.send(
+                path: "projects/\(id)",
+                method: "DELETE",
+                token: token
+            )
+            projects.removeAll { $0.id == id }
+            receivedApplications.removeAll { $0.projectID == id }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
         }
     }
 }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProjectView: View {
     let store: ProjectStore
+    let currentUserID: UUID?
 
     var body: some View {
         NavigationStack {
@@ -16,6 +17,14 @@ struct ProjectView: View {
                         .font(.title3.bold())
                         .frame(maxWidth: .infinity, alignment: .leading)
 
+                    if !store.receivedApplications.isEmpty {
+                        ApplicationInbox(store: store)
+                    }
+
+                    if !store.myApplications.isEmpty {
+                        MyApplications(store: store)
+                    }
+
                     if store.projects.isEmpty && !store.isLoading {
                         ContentUnavailableView(
                             "Проектов пока нет",
@@ -26,7 +35,11 @@ struct ProjectView: View {
                     } else {
                         ForEach(store.projects) { project in
                             NavigationLink {
-                                ProjectDetailsView(project: project, store: store)
+                                ProjectDetailsView(
+                                    project: project,
+                                    store: store,
+                                    isOwner: project.ownerID == currentUserID
+                                )
                             } label: {
                                 CardActiveProject(
                                     category: project.category.uppercased(),
@@ -97,6 +110,10 @@ private struct ProjectSummary: View {
 private struct ProjectDetailsView: View {
     let project: Project
     let store: ProjectStore
+    let isOwner: Bool
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         List {
@@ -131,12 +148,104 @@ private struct ProjectDetailsView: View {
                     }
                 }
             }
+
+            if isOwner {
+                Section {
+                    Button("Удалить проект", role: .destructive) {
+                        showDeleteConfirmation = true
+                    }
+                }
+            }
         }
         .navigationTitle(project.title)
         .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog(
+            "Удалить проект без возможности восстановления?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Удалить проект", role: .destructive) {
+                Task {
+                    if await store.deleteProject(id: project.id) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ApplicationInbox: View {
+    let store: ProjectStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Заявки в мои проекты")
+                .font(.title3.bold())
+
+            ForEach(store.receivedApplications) { application in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(application.userName)
+                        .font(.headline)
+                    Text("\(application.projectTitle) · \(application.roleTitle)")
+                        .foregroundStyle(.secondary)
+
+                    if application.status == "pending" {
+                        HStack {
+                            Button("Принять") {
+                                Task { await store.decideApplication(id: application.id, accept: true) }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.green)
+
+                            Button("Отклонить") {
+                                Task { await store.decideApplication(id: application.id, accept: false) }
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.red)
+                        }
+                    } else {
+                        Text(application.status == "accepted" ? "Принята" : "Отклонена")
+                            .font(.caption.weight(.semibold))
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+    }
+}
+
+private struct MyApplications: View {
+    let store: ProjectStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Мои отклики")
+                .font(.title3.bold())
+
+            ForEach(store.myApplications) { application in
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(application.projectTitle).font(.headline)
+                        Text("\(application.roleTitle) · \(application.status)")
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if application.status != "accepted" {
+                        Button("Отменить", role: .destructive) {
+                            Task { await store.cancelApplication(id: application.id) }
+                        }
+                    }
+                }
+                .padding()
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
     }
 }
 
 #Preview {
-    ProjectView(store: ProjectStore())
+    ProjectView(store: ProjectStore(), currentUserID: nil)
 }

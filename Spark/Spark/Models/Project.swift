@@ -2,6 +2,7 @@ import Foundation
 
 struct Project: Identifiable, Equatable, Codable {
     let id: UUID
+    let ownerID: UUID?
     var category: String
     var title: String
     var summary: String
@@ -11,6 +12,7 @@ struct Project: Identifiable, Equatable, Codable {
 
     init(
         id: UUID = UUID(),
+        ownerID: UUID? = nil,
         category: String,
         title: String,
         summary: String,
@@ -19,6 +21,7 @@ struct Project: Identifiable, Equatable, Codable {
         memberCount: Int = 1
     ) {
         self.id = id
+        self.ownerID = ownerID
         self.category = category
         self.title = title
         self.summary = summary

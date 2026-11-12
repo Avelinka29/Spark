@@ -110,6 +110,7 @@ struct ProjectDTO: Codable {
     func makeProject() -> Project {
         Project(
             id: id ?? UUID(),
+            ownerID: ownerID,
             category: category,
             title: title,
             summary: summary,
@@ -125,6 +126,31 @@ struct ProjectDTO: Codable {
             }
         )
     }
+}
+
+struct ProjectApplicationDTO: Identifiable, Decodable {
+    let id: UUID
+    let userID: UUID
+    let userName: String
+    let roleID: UUID
+    let roleTitle: String
+    let projectID: UUID
+    let projectTitle: String
+    let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, status
+        case userID = "user_id"
+        case userName = "user_name"
+        case roleID = "role_id"
+        case roleTitle = "role_title"
+        case projectID = "project_id"
+        case projectTitle = "project_title"
+    }
+}
+
+struct ApplicationStatusRequest: Encodable {
+    let status: String
 }
 
 struct ProfileDTO: Decodable {

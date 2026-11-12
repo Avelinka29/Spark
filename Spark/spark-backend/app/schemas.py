@@ -1,5 +1,6 @@
 import uuid
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -63,12 +64,34 @@ class ProjectCreate(BaseModel):
     roles: list[RoleCreate] = []
 
 
+class ProjectUpdate(BaseModel):
+    category: str | None = Field(default=None, min_length=2, max_length=80)
+    title: str | None = Field(default=None, min_length=2, max_length=200)
+    summary: str | None = Field(default=None, min_length=10)
+    owner_role: str | None = Field(default=None, min_length=2, max_length=120)
+
+
 class ProjectResponse(ProjectCreate):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     owner_id: uuid.UUID
     roles: list[RoleResponse]
+
+
+class ApplicationStatusUpdate(BaseModel):
+    status: Literal["accepted", "rejected"]
+
+
+class ApplicationResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    user_name: str
+    role_id: uuid.UUID
+    role_title: str
+    project_id: uuid.UUID
+    project_title: str
+    status: str
 
 
 class ProfileResponse(BaseModel):

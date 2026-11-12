@@ -62,13 +62,16 @@ def test_full_user_scenario() -> None:
                     "title": "Integration Test Project",
                     "summary": "Project created by the complete API integration test.",
                     "owner_role": "iOS Developer",
-                    "roles": [{"title": "Backend Developer", "skills": "FastAPI"}],
+                    "roles": [
+                        {"title": "Backend Developer", "skills": "FastAPI"},
+                        {"title": "Designer", "skills": "Figma"},
+                    ],
                 },
             )
             assert created.status_code == 201
             project = created.json()
             assert project["title"] == "Integration Test Project"
-            assert len(project["roles"]) == 1
+            assert len(project["roles"]) == 2
 
             role_id = project["roles"][0]["id"]
             application = client.post(
@@ -76,6 +79,49 @@ def test_full_user_scenario() -> None:
                 headers=headers,
             )
             assert application.status_code == 201
+
+            application_id = application.json()["id"]
+            mine = client.get("/api/v1/applications/mine", headers=headers)
+            assert mine.status_code == 200
+            assert application_id in {item["id"] for item in mine.json()}
+
+            received = client.get("/api/v1/applications/received", headers=headers)
+            assert received.status_code == 200
+            assert application_id in {item["id"] for item in received.json()}
+
+            accepted = client.patch(
+                f"/api/v1/applications/{application_id}",
+                headers=headers,
+                json={"status": "accepted"},
+            )
+            assert accepted.status_code == 200
+            assert accepted.json()["status"] == "accepted"
+
+            second_role_id = project["roles"][1]["id"]
+            second_application = client.post(
+                f"/api/v1/project-roles/{second_role_id}/applications",
+                headers=headers,
+            )
+            assert second_application.status_code == 201
+            cancelled = client.delete(
+                f"/api/v1/applications/{second_application.json()['id']}",
+                headers=headers,
+            )
+            assert cancelled.status_code == 204
+
+            updated_project = client.patch(
+                f"/api/v1/projects/{project['id']}",
+                headers=headers,
+                json={"title": "Updated Integration Project"},
+            )
+            assert updated_project.status_code == 200
+            assert updated_project.json()["title"] == "Updated Integration Project"
+
+            deleted_project = client.delete(
+                f"/api/v1/projects/{project['id']}",
+                headers=headers,
+            )
+            assert deleted_project.status_code == 204
     finally:
         asyncio.run(delete_test_user(email))
 
