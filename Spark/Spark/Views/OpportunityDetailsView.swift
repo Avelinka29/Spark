@@ -7,6 +7,7 @@ struct OpportunityDetailsView: View {
     @State private var isSaved = false
     @State private var isBookmarkLoading = false
     @State private var bookmarkError: String?
+    @State private var bookmarkFeedbackTrigger = 0
     @State private var hasApplied = false
     @State private var showAuthenticationRequired = false
 
@@ -78,6 +79,7 @@ struct OpportunityDetailsView: View {
         }
         .navigationTitle("Возможность")
         .navigationBarTitleDisplayMode(.inline)
+        .sensoryFeedback(.success, trigger: bookmarkFeedbackTrigger)
         .task(id: opportunity.id) {
             await loadBookmarkState()
         }
@@ -130,6 +132,7 @@ struct OpportunityDetailsView: View {
                 token: accessToken
             )
             isSaved.toggle()
+            bookmarkFeedbackTrigger += 1
         } catch {
             bookmarkError = error.localizedDescription
         }

@@ -59,6 +59,7 @@ struct ProjectView: View {
                 .padding(.bottom, 180)
             }
             .navigationTitle("ProjectHub")
+            .sensoryFeedback(.success, trigger: store.successFeedbackTrigger)
             .task {
                 await store.load()
             }

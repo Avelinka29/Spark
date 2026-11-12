@@ -434,6 +434,9 @@ struct LoginView: View {
                 showHome = false
             }
         }
+        .sensoryFeedback(.success, trigger: showHome) { _, isPresented in
+            isPresented
+        }
         .alert("Включить Face ID?", isPresented: $showBiometricOffer) {
             Button("Не сейчас") {
                 showHome = true

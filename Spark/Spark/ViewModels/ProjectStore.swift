@@ -9,6 +9,7 @@ final class ProjectStore {
     private(set) var errorMessage: String?
     private(set) var myApplications: [ProjectApplicationDTO] = []
     private(set) var receivedApplications: [ProjectApplicationDTO] = []
+    private(set) var successFeedbackTrigger = 0
 
     private let token: String?
 
@@ -80,6 +81,7 @@ final class ProjectStore {
                 token: token
             )
             projects.insert(response.makeProject(), at: 0)
+            successFeedbackTrigger += 1
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -110,6 +112,7 @@ final class ProjectStore {
             projects[projectIndex].vacancies[vacancyIndex].isActive = false
             projects[projectIndex].vacancies[vacancyIndex].status = "ЗАЯВКА"
             await load()
+            successFeedbackTrigger += 1
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -125,6 +128,7 @@ final class ProjectStore {
                 token: token
             )
             await load()
+            successFeedbackTrigger += 1
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -139,6 +143,7 @@ final class ProjectStore {
                 token: token
             )
             await load()
+            successFeedbackTrigger += 1
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -154,6 +159,7 @@ final class ProjectStore {
             )
             projects.removeAll { $0.id == id }
             receivedApplications.removeAll { $0.projectID == id }
+            successFeedbackTrigger += 1
             return true
         } catch {
             errorMessage = error.localizedDescription
