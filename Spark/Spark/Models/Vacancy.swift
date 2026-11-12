@@ -1,19 +1,26 @@
-//
-//  Vacancy.swift
-//  Spark
-//
-//  Created by Avelina Maksimchik on 25.07.2026.
-//
+import Foundation
 
-import SwiftUI
+struct Vacancy: Identifiable, Equatable, Codable {
+    let id: UUID
+    var title: String
+    var imageName: String
+    var status: String
+    var roleDescription: String
+    var isActive: Bool
 
-struct Vacancy: Identifiable {
-    let id = UUID()
-    let title: String
-    let imageName: String
-    let status: String
-    let roleDescription: String
-    let isActive: Bool
+    init(
+        id: UUID = UUID(),
+        title: String,
+        imageName: String = "terminal",
+        status: String = "НУЖЕН",
+        roleDescription: String,
+        isActive: Bool = true
+    ) {
+        self.id = id
+        self.title = title
+        self.imageName = imageName
+        self.status = status
+        self.roleDescription = roleDescription
+        self.isActive = isActive
+    }
 }
-
-

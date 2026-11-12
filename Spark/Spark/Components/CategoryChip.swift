@@ -23,7 +23,7 @@ struct CategoryChip: View {
                     .foregroundColor(isSelected ? .primaryWhite : .primaryGrey1)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 10)
-                    .background(isSelected ? Color.primaryLitePurple: Color.primaryWhite)
+                    .background(isSelected ? Color.primaryLitePurple : SparkColor.surface.color)
                     .clipShape(Capsule())
                 
             } else {
@@ -32,7 +32,7 @@ struct CategoryChip: View {
                     .foregroundColor(isSelected ? .primaryWhite : .primaryGrey1)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 10)
-                    .background(isSelected ? Color.primaryLitePurple: Color.primaryWhite)
+                    .background(isSelected ? Color.primaryLitePurple : SparkColor.surface.color)
                     .overlay(Capsule().stroke(.primaryGrey1))
                     .clipShape(Capsule())
                 

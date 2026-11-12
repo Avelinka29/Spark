@@ -1,116 +1,142 @@
-//
-//  ProjectView.swift
-//  Spark
-//
-//  Created by YULIYA MAKSIMCHYK on 23.06.2026.
-//
-
 import SwiftUI
 
 struct ProjectView: View {
+    let store: ProjectStore
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .top) {
-                
-           
-                ScrollView {
-                   
-                    VStack(spacing: 0) {
-                        
-                        HStack {
-                            Spacer()
-                            
-                            ActiveProject(color: .litePurple, imageName: "sparkles", title: "ПРОЕКТЫ", status: "активных", type: .count(2), isActive: true, strokeWidht: 3, titleSize: 30)
-                            
-                            ActiveProject(color: .green, imageName: "person.2", title: "РОЛИ",  status: "открыто", type: .count(3), isActive: true, strokeWidht: 3, titleSize: 30)
-                           
-                            Spacer()
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Активные проекты")
-                                .font(.system(size: 20, weight: .bold))
-                        }
+            ScrollView {
+                VStack(spacing: 16) {
+                    ProjectSummary(
+                        projectsCount: store.projects.count,
+                        rolesCount: store.openRolesCount
+                    )
+
+                    Text("Активные проекты")
+                        .font(.title3.bold())
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 20)
-                        
-                        CardActiveProject(category: "EDTECH", color: .litePurple, title: "EduScan: AI-помощник для школьников", description: "Мобильное приложение, которое помогает школьникам готовиться к ЦТ и ЦЭ с помощью ИИ. Распознаёт задания по фото", vacancies:  [
-                            Vacancy(title: "Flutter Developer", imageName: "terminal", status: "НУЖЕН", roleDescription: "Dart/Firebase", isActive: true),
-                            Vacancy(title: "ML Engineer", imageName: "terminal", status: "НУЖЕН", roleDescription: "Python/PyTorch", isActive: true),
-                            Vacancy(title: "UI/UX Designer", imageName: "terminal", status: "ЗАНЯТО", roleDescription: "Figma/Прототипирование", isActive: false),
-                            Vacancy(title: "UI/UX Designer", imageName: "terminal", status: "ЗАНЯТО", roleDescription: "Figma/Прототипирование", isActive: false)
-                        ])
-                        
-                        
-                        .padding(.bottom, 16)
-                        
-                        CardActiveProject(category: "EDTECH", color: .green, title: "EduScan: AI-помощник для школьников", description: "Мобильное приложение, которое помогает школьникам готовиться к ЦТ и ЦЭ с помощью ИИ. Распознаёт задания по фото", vacancies:  [
-                            Vacancy(title: "Flutter Developer", imageName: "terminal", status: "НУЖЕН", roleDescription: "Dart/Firebase", isActive: true),
-                            Vacancy(title: "ML Engineer", imageName: "terminal", status: "НУЖЕН", roleDescription: "Python/PyTorch", isActive: true),
-                            Vacancy(title: "UI/UX Designer", imageName: "terminal", status: "ЗАНЯТО", roleDescription: "Figma/Прототипирование", isActive: false),
-                            Vacancy(title: "UI/UX Designer", imageName: "terminal", status: "ЗАНЯТО", roleDescription: "Figma/Прототипирование", isActive: false)
-                        ])
-                        
+
+                    if store.projects.isEmpty && !store.isLoading {
+                        ContentUnavailableView(
+                            "Проектов пока нет",
+                            systemImage: "person.3.sequence",
+                            description: Text("Создай первый проект и собери свою команду.")
+                        )
+                        .padding(.vertical, 40)
+                    } else {
+                        ForEach(store.projects) { project in
+                            NavigationLink {
+                                ProjectDetailsView(project: project, store: store)
+                            } label: {
+                                CardActiveProject(
+                                    category: project.category.uppercased(),
+                                    color: .litePurple,
+                                    title: project.title,
+                                    description: project.summary,
+                                    isAuthenticated: store.isAuthenticated,
+                                    vacancies: project.vacancies
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .padding(.top, 80)
-                    
-                    
-                    
                 }
                 .padding(.horizontal, 20)
-                
-               
-                ZStack {
-                    LinearGradient(
-                        colors: [
-                            Color("PrimaryBlue"),
-                            Color("PrimaryLitePurple"),
-                            Color("PrimaryPurple")
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea(edges: .top)
-                    
-                    Circle()
-                        .fill(.primaryYellow)
-                        .blur(radius: 60)
-                        .frame(width: 100, height: 120)
-                        .offset(x: 160, y: 8)
-                    
-                    HStack {
-                        Text("ProjectHub")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.primaryWhite)
-                        
-                        Spacer()
-                        
-                        ZStack {
-                            Rectangle()
-                                .fill(.primaryWhite)
-                                .opacity(0.4)
-                                .cornerRadius(30)
-                                .frame(width: 40, height: 40)
-                            
-                            Image(systemName: "folder")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 22)
-                                .foregroundStyle(.primaryWhite)
-                        }
-                    }
-                    .padding(.top, 50)
-                    .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 180)
+            }
+            .navigationTitle("ProjectHub")
+            .task {
+                await store.load()
+            }
+            .overlay(alignment: .bottom) {
+                if let errorMessage = store.errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .padding(10)
+                        .background(.thinMaterial)
+                        .clipShape(Capsule())
+                        .padding(.bottom)
                 }
-                .frame(height: 0)
-                .zIndex(1)
-                
             }
         }
     }
 }
 
+private struct ProjectSummary: View {
+    let projectsCount: Int
+    let rolesCount: Int
+
+    var body: some View {
+        HStack {
+            ActiveProject(
+                color: .litePurple,
+                imageName: "sparkles",
+                title: "ПРОЕКТЫ",
+                status: "активных",
+                type: .count(projectsCount),
+                isActive: true,
+                strokeWidht: 3,
+                titleSize: 26
+            )
+
+            ActiveProject(
+                color: .green,
+                imageName: "person.2",
+                title: "РОЛИ",
+                status: "открыто",
+                type: .count(rolesCount),
+                isActive: true,
+                strokeWidht: 3,
+                titleSize: 26
+            )
+        }
+    }
+}
+
+private struct ProjectDetailsView: View {
+    let project: Project
+    let store: ProjectStore
+
+    var body: some View {
+        List {
+            Section("О проекте") {
+                Text(project.summary)
+                Label(project.ownerRole, systemImage: "person.crop.circle")
+                Label("\(project.memberCount) участников", systemImage: "person.2")
+            }
+
+            Section("Роли") {
+                if !store.isAuthenticated {
+                    Label("Войдите, чтобы откликаться на роли", systemImage: "lock")
+                        .foregroundStyle(.secondary)
+                }
+
+                ForEach(project.vacancies) { vacancy in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(vacancy.title)
+                            .font(.headline)
+                        Text(vacancy.roleDescription)
+                            .foregroundStyle(.secondary)
+
+                        Button(vacancy.isActive ? "Откликнуться" : vacancy.status) {
+                            Task {
+                                await store.join(
+                                    projectID: project.id,
+                                    vacancyID: vacancy.id
+                                )
+                            }
+                        }
+                        .disabled(!vacancy.isActive || !store.isAuthenticated)
+                    }
+                }
+            }
+        }
+        .navigationTitle(project.title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 #Preview {
-    ProjectView()
+    ProjectView(store: ProjectStore())
 }

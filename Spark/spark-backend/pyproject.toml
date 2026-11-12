@@ -1,0 +1,28 @@
+[project]
+name = "spark-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.14,<2",
+    "asyncpg>=0.30,<1",
+    "email-validator>=2.2,<3",
+    "fastapi>=0.115,<1",
+    "google-auth>=2.38,<3",
+    "httpx>=0.28,<1",
+    "pwdlib[argon2]>=0.2,<1",
+    "pydantic-settings>=2.7,<3",
+    "pyjwt>=2.10,<3",
+    "requests>=2.32,<3",
+    "sqlalchemy[asyncio]>=2.0,<3",
+    "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9", "pytest-asyncio>=0.25,<1"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

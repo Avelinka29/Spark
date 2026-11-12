@@ -1,100 +1,59 @@
-//
-//  PreviewEventMap.swift
-//  Spark
-//
-//  Created by Avelina Maksimchik on 22.07.2026.
-//
-
 import SwiftUI
 
-
-
 struct PreviewEventMap: View {
-    
-    let eventTitle: String
-    let eventCategory: EventCategory
-    let eventColor: SparkColor
+    let title: String
+    let category: EventCategory
+    let color: SparkColor
     let distance: String
-    
+    let openDetails: () -> Void
+
     var body: some View {
         HStack(spacing: 10) {
-            
-            ZStack {
-                
-                Rectangle()
-                    .frame(width: 50, height: 50)
-                    .cornerRadius(10)
-                    .foregroundColor(eventColor.color)
-                
-                Image(systemName: "scope")
-                    .foregroundColor(.primaryWhite)
-                    .font(.system(size: 24))
-                    
-                
-            }
-            
+            Image(systemName: "scope")
+                .font(.system(size: 24))
+                .foregroundStyle(.white)
+                .frame(width: 50, height: 50)
+                .background(color.color)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
             VStack(alignment: .leading, spacing: 6) {
-                
-                Text(eventTitle)
+                Text(title)
                     .font(.system(size: 20, weight: .medium))
                     .lineLimit(2)
-                    
-                
-                
-                    Text("\(eventCategory.rawValue) • \(distance) от тебя")
+
+                Text("\(category.rawValue) • \(distance)")
                     .font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                    
-            }.frame(maxWidth: .infinity, alignment: .leading)
-                .foregroundStyle(.primaryWhite)
-                
-            
-            Spacer()
-            
-            Button {
-                
-            } label: {
-                HStack(spacing: 6) {
-                   
-                    Text("Перейти")
-                        .foregroundColor(.primaryWhite)
-                        
-                    
-                    Image(systemName: "location")
-                        .foregroundColor(.primaryWhite)
-                        
-             
-                    
-                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .foregroundStyle(.primaryWhite)
+
+            Button(action: openDetails) {
+                Label("Перейти", systemImage: "arrow.forward")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(eventColor.color)
+                    .background(color.color)
                     .clipShape(Capsule())
-                    
-                    
-                
-            }.fixedSize(horizontal: true, vertical: false)
-            
-            
-            
-        }.padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .frame(height: 90)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .frame(height: 90)
         .frame(maxWidth: .infinity)
-            .background(Color.primaryGrey1.opacity(0.3))
-            .background(.regularMaterial)
-            .cornerRadius(20)
-            
-        
-        
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 }
 
 #Preview {
-    PreviewEventMap(eventTitle: "Хахатоны", eventCategory: .hackathons, eventColor: .litePurple, distance: "1.1 км")
+    PreviewEventMap(
+        title: "Хакатон",
+        category: .hackathons,
+        color: .litePurple,
+        distance: "1,1 км",
+        openDetails: {}
+    )
 }
-
-
-

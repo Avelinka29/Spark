@@ -1,159 +1,127 @@
-//
-//  EventCard.swift
-//  Spark
-//
-//  Created by mac on 20.06.26.
-//
-////kjhgfd
-
 import SwiftUI
 
-
-
 struct EventCard: View {
-    
-    let image: String
+    let imageName: String
     let category: EventCategory
     let title: String
-    let description: String
+    let summary: String
     let color: Color
-    let date: String
-    let participants: Int?
-    let location: String
+    let dateText: String
+    let participantCount: Int?
+    let locationName: String
     let status: String?
-    let bonus: Int?
-    
-    
-    @State private var showEvent = false
-    
-    var body: some View {
-        
+    let reward: Int?
 
-            VStack (alignment: .leading){
-                
-                ZStack (alignment: .top){
-                    
-                    Image(image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 200)
-                        .clipped()
-                    
-                    HStack{
-                        if let status{
-                            Text(status)
-                                .font(Font.system(size: 14, weight: .semibold))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 18)
-                                .padding(.vertical, 6)
-                                .background(Color.white.opacity(0.9))
-                                .clipShape(Capsule())
-                        }
-                        Spacer()
-                        
-                        if let bonus {
-                            Text("\(bonus) Br")
-                                .font(Font.system(size: 14, weight: .semibold))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 18)
-                                .padding(.vertical, 6)
-                                .background(.primaryYellow)
-                                .clipShape(Capsule())
-                        }
-                        
-                    }.padding(15)
-                    
-                    
-                }
-                
-                
-                VStack(alignment: .leading) {
-                    HStack{
-                        Text(category.rawValue)
+    var body: some View {
+        VStack(alignment: .leading) {
+            ZStack(alignment: .top) {
+                Image(imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 200)
+                    .clipped()
+
+                HStack {
+                    if let status {
+                        Text(status)
                             .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(color)
+                            .foregroundStyle(.primary)
                             .padding(.horizontal, 18)
                             .padding(.vertical, 6)
-                            .background(color.opacity(0.2))
-                            .overlay(Capsule().stroke(color, lineWidth: 2))
+                            .background(Color(.secondarySystemBackground).opacity(0.95))
                             .clipShape(Capsule())
-                            
                     }
 
-                
+                    Spacer()
+
+                    if let reward {
+                        Text("\(reward) Br")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 6)
+                            .background(.primaryYellow)
+                            .clipShape(Capsule())
+                    }
+                }
+                .padding(15)
+            }
+
+            VStack(alignment: .leading) {
+                Text(category.rawValue)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(color)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 6)
+                    .background(color.opacity(0.2))
+                    .overlay(Capsule().stroke(color, lineWidth: 2))
+                    .clipShape(Capsule())
+
                 Text(title)
                     .font(.system(size: 22, weight: .semibold))
                     .padding(.bottom, 10)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(summary)
                     .lineLimit(2)
-                
-                Text(description)
-                    .lineLimit(2)
-                    .foregroundColor(.primaryGrey1)
+                    .foregroundStyle(.primaryGrey1)
                     .font(.system(size: 16, weight: .medium))
                     .lineSpacing(8)
                     .padding(.bottom, 10)
-                
-                HStack {
-                    HStack {
-                        Image(systemName: "mappin")
-                        Text(location)}
-                    Spacer()
-                    HStack
-                    {
-                        Image(systemName: "calendar")
-                        Text(date)
-                    }
-                    
-                }.foregroundColor(.primaryGrey1)
-                    .padding(.bottom, 10)
-                    
-                    Rectangle()
-                        .frame(height: 1)
-                        .foregroundColor(.primaryGrey1.opacity(0.2))
-                
-                HStack{
-                    
-                    if let participants {
-                        ParticipantsView()
-                        
-                        Text("+\(participants)")
-                            .foregroundColor(.primaryGrey1)
-                            .font(.system(size: 16, weight: .semibold))
-                    } else {
-                        Image(systemName: "flame")
-                            .foregroundColor(.primaryGrey1)
-                            .font(.system(size: 16, weight: .semibold))
-                        Text("Популярное")
-                            .foregroundColor(.primaryGrey1)
-                            .font(.system(size: 16, weight: .semibold))
-                    }
-                   
-                    Spacer()
-                    
-                    SparkButton(title: "Подробнее", icon: "arrow.forward", backgroundColor: .litePurple, isInfinity: false){
-                        showEvent = true
-                    }
-                    
-                    
-                }}.padding()
-            }
-            .background(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .shadow(color: .black.opacity(0.25),
-                            radius: 4,
-                            x: 0,
-                            y: 5
-                    )
-    }
-    }
-    
 
+                HStack {
+                    Label(locationName, systemImage: "mappin")
+                    Spacer()
+                    Label(dateText, systemImage: "calendar")
+                }
+                .foregroundStyle(.primaryGrey1)
+                .padding(.bottom, 10)
+
+                Divider()
+
+                HStack {
+                    if let participantCount {
+                        ParticipantsView()
+                        Text("+\(participantCount)")
+                    } else {
+                        Label("Популярное", systemImage: "flame")
+                    }
+
+                    Spacer()
+
+                    HStack(spacing: 8) {
+                        Text("Подробнее")
+                        Image(systemName: "arrow.forward")
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(.primaryLitePurple)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .foregroundStyle(.primaryGrey1)
+            }
+            .padding()
+        }
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 5)
+    }
+}
 
 #Preview {
     EventCard(
-        image: "Hahaton",
+        imageName: "Hahaton",
         category: .hackathons,
-        title: "Хахатон Сбера 2026: AI Transformation", description: "Создай инновационное решение для миллионов пользователей, 48 часов кода", color: .primaryLitePurple, date: "12 мая — 14 мая", participants: 142, location: "Минск, Беларусь", status: "АКТУАЛЬНО", bonus: 5000
+        title: "Хакатон Сбера 2026",
+        summary: "Создай инновационное решение за 48 часов.",
+        color: .primaryLitePurple,
+        dateText: "12 мая — 14 мая",
+        participantCount: 142,
+        locationName: "Минск, Беларусь",
+        status: "АКТУАЛЬНО",
+        reward: 5000
     )
-
 }

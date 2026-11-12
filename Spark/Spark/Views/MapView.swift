@@ -1,90 +1,84 @@
-//
-//  MapView.swift
-//  Spark
-//
-//  Created by Avelina Maksimchik on 09.07.2026.
-//
-
-import SwiftUI
 import MapKit
+import SwiftUI
 
 struct MapView: View {
+    let isAuthenticated: Bool
 
-    @StateObject private var vm = MapViewModel()
+    @State private var model = MapViewModel()
+    @State private var presentedOpportunity: Opportunity?
 
     var body: some View {
+        @Bindable var model = model
 
         ZStack {
-
-            Map(position: $vm.cameraPosition) {
-
+            Map(position: $model.cameraPosition) {
                 UserAnnotation()
 
-                ForEach(vm.filteredOpportunities) { opportunity in
-
-                    Annotation(
-                        opportunity.title,
-                        coordinate: opportunity.coordinate
-                    ) {
-
-                        OpportunityPin(color: opportunity.color)
-                            .onTapGesture {
-                                vm.select(opportunity)
-                                vm.focus(on: opportunity)
-                            }
+                ForEach(model.visibleOpportunities) { opportunity in
+                    if let coordinate = opportunity.coordinate {
+                        Annotation(opportunity.title, coordinate: coordinate) {
+                            OpportunityPin(color: opportunity.mapColor)
+                                .onTapGesture {
+                                    model.select(opportunity)
+                                }
+                        }
                     }
                 }
             }
             .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 20) {
-                
-                MapSearchBar(text: $vm.searchText)
+                MapSearchBar(text: $model.searchText)
                     .padding(.horizontal, 20)
                     .padding(.top, -40)
-                
+
                 HStack {
-                    
-                    OportunityMarker(count: .constant(vm.opportunitiesCount))
+                    OportunityMarker(count: .constant(model.opportunitiesCount))
                         .frame(width: 210)
-                    
                     Spacer()
                 }
                 .padding(.horizontal, 20)
-                
-                
-                
+
                 Spacer()
-                
-                    
-                    if let opportunity = vm.selectedOpportunity {
-                        PreviewEventMap (eventTitle: opportunity.title, eventCategory: opportunity.category, eventColor: opportunity.color, distance: vm.distance(from: opportunity.coordinate)
-                        )
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 30)
-                        .transition(.move(edge: .bottom))
-                        .gesture(
-                            DragGesture()
-                                .onEnded { value in
 
-                                    if value.translation.height > 60 {
-
-                                        withAnimation(.spring()) {
-                                            vm.selectedOpportunity = nil
-                                        }
+                if let opportunity = model.selectedOpportunity,
+                   let coordinate = opportunity.coordinate {
+                    PreviewEventMap(
+                        title: opportunity.title,
+                        category: opportunity.category,
+                        color: opportunity.mapColor,
+                        distance: model.distance(from: coordinate)
+                    ) {
+                        presentedOpportunity = opportunity
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 30)
+                    .transition(.move(edge: .bottom))
+                    .gesture(
+                        DragGesture()
+                            .onEnded { value in
+                                if value.translation.height > 60 {
+                                    withAnimation(.spring()) {
+                                        model.selectedOpportunity = nil
                                     }
                                 }
-                        )
-
-                        
-                    }
-                    
-                    
-                }.animation(.spring(response: 0.35), value: vm.selectedOpportunity != nil)
-            
+                            }
+                    )
+                }
+            }
+            .animation(.spring(response: 0.35), value: model.selectedOpportunity?.id)
+        }
+        .sheet(item: $presentedOpportunity) { opportunity in
+            NavigationStack {
+                OpportunityDetailsView(
+                    opportunity: opportunity,
+                    isAuthenticated: isAuthenticated
+                )
             }
         }
     }
+}
+
 #Preview {
-    MapView()
+    MapView(isAuthenticated: false)
 }

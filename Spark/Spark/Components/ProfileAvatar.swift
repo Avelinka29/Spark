@@ -9,84 +9,58 @@ import SwiftUI
 import PhotosUI
 
 struct ProfileAvatar: View {
-    
-    @StateObject private var vm = ProfileViewModel()
-    
+    let image: UIImage?
+    let canEdit: Bool
+    let onImageSelected: (Data) -> Void
+
+    @State private var selectedItem: PhotosPickerItem?
+
     var body: some View {
-        
-        
-        HStack{
-            
-            ZStack{
-                
-                
+        HStack {
+            ZStack {
                 RoundedRectangle(cornerRadius: 20)
-                    .foregroundStyle(.primaryWhite)
+                    .foregroundStyle(Color(.secondarySystemBackground))
                     .frame(width: 75, height: 75)
                     .shadow(radius: 20, y: 4)
-                
-                if let image = vm.avatarImage {
-                    
+
+                if let image {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
                         .frame(width: 75, height: 75)
                         .clipShape(RoundedRectangle(cornerRadius: 20))
-                    
-                    
                 } else {
-                    
                     Image(systemName: "person.fill")
-                        .foregroundStyle(.primaryGrey1)
+                        .foregroundStyle(.primaryLitePurple)
                         .font(.system(size: 45))
                 }
-                
-                
             }
-            
-            .overlay(alignment: .bottomTrailing){
-                
-                if vm.avatarImage == nil {
-                    
-                    PhotosPicker(selection: $vm.selectedItem, matching: .images){
-                        
-                        Image(systemName: "plus")
+            .overlay(alignment: .bottomTrailing) {
+                if canEdit {
+                    PhotosPicker(selection: $selectedItem, matching: .images) {
+                        Image(systemName: image == nil ? "plus" : "pencil")
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.primaryWhite)
-                            .frame(alignment: .bottomTrailing)
-                            .background{
-                                GradientBackground()
-                            }
+                            .frame(width: 28, height: 28)
+                            .background { GradientBackground() }
                             .clipShape(Circle())
                             .shadow(radius: 3)
-                        
-                        
                     }
-                    
                 }
-                
-                
-                
-                Spacer()
-                
-            }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 20)
-                .offset(y: 55)
-            
- 
+            .offset(y: 55)
         }
-        
-        .task(id: vm.selectedItem) {
-            await vm.loadImage()
+        .task(id: selectedItem) {
+            guard let data = try? await selectedItem?.loadTransferable(type: Data.self) else {
+                return
+            }
+            onImageSelected(data)
         }
-        
-        
-        
     }
-    
-    
 }
 
 #Preview {
-    ProfileAvatar()
+    ProfileAvatar(image: nil, canEdit: true, onImageSelected: { _ in })
 }

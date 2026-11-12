@@ -1,39 +1,23 @@
-//
-//  CreateProjectView.swift
-//  Spark
-//
-//  Created by YULIYA MAKSIMCHYK on 24.06.2026.
-//
-
 import SwiftUI
 
 struct CreateProjectView: View {
-    
+    struct DraftRole: Identifiable {
+        let id = UUID()
+        var name = ""
+        var skills = ""
+    }
+
     @Environment(\.dismiss) private var dismiss
-    
+
+    let store: ProjectStore
+
     @State private var projectTitle = ""
     @State private var projectDescription = ""
-    
     @State private var ownerRole = ""
-    
-    @State private var selectedCategory = ""
-    
-    @State private var selectedRole: Set<String> = []
-    
-    @State private var createProject: Bool = false
-    
-    @State private var showCategoryPicker = false
-    
-    struct ProjectRole: Identifiable {
-        let id = UUID()
-        var name: String = ""
-        var skils: String = ""
-    }
-    
-    @State private var projectRoles: [ProjectRole] = [ProjectRole()]
+    @State private var selectedCategory = "EdTech"
+    @State private var projectRoles = [DraftRole()]
 
-    
-    let category = [
+    private let categories = [
         "FinTech",
         "EdTech",
         "GreenTech",
@@ -41,285 +25,103 @@ struct CreateProjectView: View {
         "Социальный проект",
         "Другое"
     ]
-    
-    let roles = [
-        "Backend Developer",
-        "Fronted Developer",
-        "iOS Developer",
-        "Android Developer",
-        "UI/UX Designer",
-        "ML",
-        "QA",
-        "Project Manager",
-        "Data Scientist",
-        
-    ]
-    
-    var body: some View {
-        NavigationStack {
-            
-            ZStack {
-                VStack(spacing: 0){
-                    
-                    
-                    ZStack {
-                        LinearGradient(
-                            colors: [
-                                Color("PrimaryBlue"),
-                                Color("PrimaryLitePurple"),
-                                Color("PrimaryPurple")
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing)
-                        
-                        Circle()
-                            .fill(.primaryYellow)
-                            .blur(radius: 60)
-                            .frame(width: 100, height: 120)
-                            .offset(x: 160, y: 8)
-                        
-                        HStack {
-                            Text("Новый проект")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(.primaryWhite)
-                            
-                            Spacer()
-                            
-                            ZStack{
-                                
-                                Rectangle()
-                                    .fill(.primaryWhite)
-                                    .opacity(0.4)
-                                    .cornerRadius(30)
-                                    .frame(width: 40, height: 40)
-                                
-                                Image("LogoFirst")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 22)
-                            }
-                            
-                        }.padding(.top, 50)
-                            .padding(.horizontal, 20)
-                        
-                    }.zIndex(1)
-                    .frame(height: 120)
-                        .ignoresSafeArea(edges: .top)
-                    
-                    
-                    
-                    ScrollView{
-                        
-                        VStack {
-                    
-                    
-                            
-                            Spacer()
-                            
-                            VStack{
-                                HStack{
-                                    Text("Название проекта")
-                                        .foregroundStyle(Color(.primaryGreyDark2))
-                                        .font(.system(size: 16, weight: .semibold))
-                                    Spacer()
-                                }
-                                SparkTextField( placeholder: "Например: StoneGate", text: $projectDescription, height: 35, cornerRadius: 10)
-                            }
-                            
-                            Spacer()
-                            
-                            VStack{
-                                HStack{
-                                    Text("Описание")
-                                        .foregroundStyle(Color(.primaryGreyDark2))
-                                        .font(.system(size: 16, weight: .semibold))
-                                    Spacer()
-                                }
-                                //TODO: заменить на большой текст файлд для описания
-                                SparkTextField( placeholder: "Расскажи, что делает проект и для кого", text: $projectTitle, height: 35, cornerRadius: 10)
-                            }
-                            
-                            Spacer()
-                            
-                            
-                            
-                            VStack {
-                                HStack{
-                                    Text("Категория")
-                                        .foregroundStyle(Color(.primaryGreyDark2))
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .padding(.top, 20)
-                                    Spacer()
-                                    
-                                    
-                                }
-                                SparkPicker(title: "Выберите категорию",
-                                            options: category,
-                                            selection: $selectedCategory, showPicker: $showCategoryPicker )
-                                
-                            }
-                            
-                            Spacer()
-                            
-                            VStack{
-                                HStack {
-                                    
-                                    Text("Роли в команде")
-                                        .foregroundStyle(Color(.primaryGreyDark2))
-                                        .font(.system(size: 16, weight: .semibold))
-                                    
-                                    Spacer()
-                                    
-                                    HStack{
-                                        
-                                        
-                                        Button {
-                                            projectRoles.append(ProjectRole())
-                                        }
-                                        label: {
-                                            Image(systemName: "plus")
-                                                .foregroundStyle(Color(.primaryLitePurple))
-                                                .font(.system(size: 16, weight: .semibold))
-                                            Text("Добавить роль")
-                                                .foregroundStyle(Color(.primaryLitePurple))
-                                                .font(.system(size: 16, weight: .semibold))
-                                        }
-                                        
-                                    }
-                                }.padding(.top, 20)
-                            }
-                            
-                            
-                            ForEach(projectRoles.indices, id: \.self) {index in
-                                
-                                VStack(alignment: .leading, spacing: 20){
-                                    
-                                    
-                                    HStack{
-                                        
-                                    
-                                    Text("Название роли")
-                                        .foregroundStyle(Color(.primaryGreyDark2))
-                                        .font(.system(size: 16, weight: .semibold))
-                                    
-                                    Spacer ()
-                                        
-                                        Button(role: .destructive){
-                                            projectRoles.remove(at: index)}
-                                        label: {
-                                                Image(systemName: "trash")
-                                                
-                                            }
-                                    }
-                                    
-                                    
-                                    SparkTextField(placeholder: "iOS Developer", text: $projectRoles[index].name, height: 35, cornerRadius: 10)
-                                    
-                                    Divider()
-                                    
-                                    Text("Навыки")
-                                        .foregroundStyle(Color(.primaryGreyDark2))
-                                        .font(.system(size: 16, weight: .semibold))
-                                    
-                                    SparkTextField(placeholder: "Swift/SwiftUI", text: $projectRoles[index].skils, height: 35, cornerRadius: 10)
-                                    
-                                    
-                                }
-                            
-                                
-                            }.frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color(.primaryGrey3.opacity(0.1)))
-                                .clipShape(RoundedRectangle(cornerRadius: 15))
-                                .overlay(RoundedRectangle(cornerRadius: 15).stroke(Color.primaryGrey3.opacity(0.3), lineWidth: 1))
-                            
 
-                                
-                                
-                            }
-                            
-                        }.padding(.horizontal, 20)
-                            .padding(.vertical, 20)
-                        
-                        
-                    }.scrollClipDisabled(true)
-                        .safeAreaBar(edge: .bottom){
-                            SparkButton(title: "Создать проект", icon: nil, backgroundColor: .litePurple, isInfinity: true){
-                                createProject = true
-                                dismiss()
-                                
-                        }.padding(.horizontal, 20)
-                                .padding(.vertical, 20)
-                        
-                    
-
-                    
-                }
-                
-            if showCategoryPicker {
-                
-                ZStack{
-                    Color.black.opacity(0.1)
-                        .ignoresSafeArea()
-                        .onTapGesture {withAnimation
-                            {showCategoryPicker = false}}
-                    
-                    VStack {
-                        categoryDropdown
-                            .padding(.top, 380)
-                        Spacer()
-                    }
-                    
-                    
-                    
-                }
-            }
-                
-            }
-        }}
-    
-    private var categoryDropdown: some View {
-        
-
-
-            VStack(spacing: 0) {
-                ForEach(category, id: \.self) { option in
-                    Button {
-                        selectedCategory = option
-
-                        withAnimation {
-                            showCategoryPicker = false
-                        }
-                    } label: {
-                        HStack {
-                            Text(option)
-
-                            Spacer()
-
-                            if selectedCategory == option {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.primaryLitePurple)
-                            }
-                        }
-                        .padding()
-                        .foregroundStyle(.black)
-                    }
-
-                    if option != category.last {
-                        Divider()
-                    }
-                }
-            }
-            .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 15))
-            .padding(.horizontal, 20)
-
- 
-        }
-    
+    private var canCreate: Bool {
+        !projectTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !projectDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !ownerRole.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Основное") {
+                    TextField("Название проекта", text: $projectTitle)
+
+                    TextField(
+                        "Описание проекта",
+                        text: $projectDescription,
+                        axis: .vertical
+                    )
+                    .lineLimit(4...8)
+
+                    Picker("Категория", selection: $selectedCategory) {
+                        ForEach(categories, id: \.self) { category in
+                            Text(category).tag(category)
+                        }
+                    }
+
+                    TextField("Ваша роль", text: $ownerRole)
+                }
+
+                Section {
+                    ForEach($projectRoles) { $role in
+                        VStack(alignment: .leading) {
+                            TextField("Название роли", text: $role.name)
+                            TextField("Необходимые навыки", text: $role.skills)
+                        }
+                    }
+                    .onDelete { offsets in
+                        projectRoles.remove(atOffsets: offsets)
+                    }
+
+                    Button("Добавить роль", systemImage: "plus") {
+                        projectRoles.append(DraftRole())
+                    }
+                } header: {
+                    Text("Роли в команде")
+                } footer: {
+                    Text("Пустые роли не будут добавлены.")
+                }
+            }
+            .navigationTitle("Новый проект")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Создать") {
+                        createProject()
+                    }
+                    .disabled(!canCreate)
+                }
+            }
+        }
+    }
+
+    private func createProject() {
+        let vacancies = projectRoles.compactMap { role -> Vacancy? in
+            let name = role.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else {
+                return nil
+            }
+
+            return Vacancy(
+                title: name,
+                roleDescription: role.skills.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }
+
+        let project = Project(
+            category: selectedCategory,
+            title: projectTitle.trimmingCharacters(in: .whitespacesAndNewlines),
+            summary: projectDescription.trimmingCharacters(in: .whitespacesAndNewlines),
+            ownerRole: ownerRole.trimmingCharacters(in: .whitespacesAndNewlines),
+            vacancies: vacancies
+        )
+
+        Task {
+            if await store.createProject(project) {
+                dismiss()
+            }
+        }
+    }
+}
 
 #Preview {
-    CreateProjectView()
+    CreateProjectView(store: ProjectStore())
 }

@@ -28,7 +28,7 @@ struct SparkTextField: View {
          iconSize: Double = 18,
          placeholder: String,
          borderColor: SparkColor = .grey,
-         backgroundColor: SparkColor = .white,
+         backgroundColor: SparkColor = .surface,
          isSecure: Bool = false,
          borderWidth: Double = 1,
          text: Binding<String>,
@@ -58,10 +58,17 @@ struct SparkTextField: View {
                         .foregroundStyle(iconColor.color)
                 }
                 if isSecure {
-                    SecureField(placeholder, text: $text)
+                    SecureField(
+                        "",
+                        text: $text,
+                        prompt: Text(placeholder).foregroundStyle(.primaryGrey1)
+                    )
                 } else {
-                    
-                    TextField(placeholder, text: $text)
+                    TextField(
+                        "",
+                        text: $text,
+                        prompt: Text(placeholder).foregroundStyle(.primaryGrey1)
+                    )
                 
                 
             }}
@@ -84,7 +91,7 @@ struct SparkTextField: View {
         iconSize: 18.0,
         placeholder: "Имя",
         borderColor: .grey,
-        backgroundColor: .white,
+        backgroundColor: .surface,
         isSecure: false,
         text: .constant(""),
         height: 50,

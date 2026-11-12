@@ -1,58 +1,118 @@
-//
-//  MockOpportunity.swift
-//  Spark
-//
-//  Created by Avelina Maksimchik on 09.07.2026.
-//
+import Foundation
 
-import SwiftUI
-import MapKit
-
-let mockOpportunities = [
-    
+let mockOpportunities: [Opportunity] = [
     Opportunity(
-            title: "AI Hackathon Sber",
-            description: "48 часов разработки",
-            category: .hackathons,
-            coordinate: CLLocationCoordinate2D(
-                latitude: 53.9023,
-                longitude: 27.5619
-            ),
-            address: "Минск",
-            color: .litePurple
-            
-        ),
-
-        Opportunity(
-            title: "EPAM Internship",
-            description: "Junior iOS",
-            category: .internships,
-            coordinate: CLLocationCoordinate2D(
-                latitude: 53.9045,
-                longitude: 27.5670
-            ),
-            address: "Минск",
-            color: .green
-            
-        ),
-
-        Opportunity(
-            title: "BSUIR Grant",
-            description: "Первый проект",
-            category: .grants,
-            coordinate: CLLocationCoordinate2D(
-                latitude: 53.9001,
-                longitude: 27.5490
-            ),
-            address: "Минск",
-            color: .yellow
-           
-        )
-    
-    
-    
+        id: UUID(),
+        imageName: "Hahaton",
+        category: .hackathons,
+        title: "Хакатон Сбера 2026: AI Transformation",
+        summary: "Создай инновационное решение для миллионов пользователей за 48 часов.",
+        details: "Команды разработают прототип продукта на основе искусственного интеллекта. Участников ждут менторы, технические консультации и презентация решений перед экспертами.",
+        themeColor: .primaryLitePurple,
+        mapColor: .litePurple,
+        dateText: "12 мая — 14 мая",
+        deadlineText: "10 мая 2026",
+        participantCount: 142,
+        locationName: "Минск, Беларусь",
+        status: "АКТУАЛЬНО",
+        reward: 5000,
+        organizer: "Сбер",
+        latitude: 53.9023,
+        longitude: 27.5619
+    ),
+    Opportunity(
+        id: UUID(),
+        imageName: "stazh_Yandex",
+        category: .internships,
+        title: "Стажировка Frontend в Яндексе",
+        summary: "Летняя стажировка для студентов 2–4 курса с работой над реальными продуктами.",
+        details: "Участники присоединятся к продуктовой команде, получат наставника и смогут пройти полный цикл разработки пользовательской функции.",
+        themeColor: .primaryGreen,
+        mapColor: .green,
+        dateText: "Июнь — август 2026",
+        deadlineText: "25 мая 2026",
+        participantCount: nil,
+        locationName: "Удалённо",
+        status: "НАБОР ОТКРЫТ",
+        reward: nil,
+        organizer: "Яндекс",
+        latitude: 53.9045,
+        longitude: 27.5670
+    ),
+    Opportunity(
+        id: UUID(),
+        imageName: "granty",
+        category: .grants,
+        title: "Грант БГУИР: Твой первый проект",
+        summary: "Финансирование до 5000 рублей на реализацию социально значимых идей.",
+        details: "Программа помогает студенческим командам проверить идею, собрать прототип и получить экспертную поддержку для запуска проекта.",
+        themeColor: .primaryYellow,
+        mapColor: .yellow,
+        dateText: "20 мая — 30 июня",
+        deadlineText: "20 мая 2026",
+        participantCount: nil,
+        locationName: "Минск, Беларусь",
+        status: "ГРАНТЫ",
+        reward: 5000,
+        organizer: "БГУИР",
+        latitude: 53.9001,
+        longitude: 27.5490
+    ),
+    Opportunity(
+        id: UUID(),
+        imageName: "olimpiada",
+        category: .contests,
+        title: "Олимпиада по программированию",
+        summary: "Ежегодный конкурс для школьников 9–11 классов.",
+        details: "Участники решают алгоритмические задачи и получают возможность представить свой регион на финальном этапе.",
+        themeColor: .primaryLitePurple,
+        mapColor: .litePurple,
+        dateText: "12 мая — 14 мая",
+        deadlineText: "1 мая 2026",
+        participantCount: nil,
+        locationName: "Все регионы",
+        status: nil,
+        reward: nil,
+        organizer: "Оргкомитет олимпиады",
+        latitude: nil,
+        longitude: nil
+    ),
+    Opportunity(
+        id: UUID(),
+        imageName: "volunteer",
+        category: .volunteering,
+        title: "Волонтёрство на FestBy",
+        summary: "Стань частью команды крупнейшего фестиваля технологий и музыки.",
+        details: "Волонтёры помогают гостям, работают с командами площадок и получают сертификат об участии.",
+        themeColor: .primaryRed,
+        mapColor: .pink,
+        dateText: "6 — 7 июля",
+        deadlineText: "15 июня 2026",
+        participantCount: 342,
+        locationName: "Брест, Беларусь",
+        status: "СЕРТИФИКАТ",
+        reward: nil,
+        organizer: "FestBy",
+        latitude: nil,
+        longitude: nil
+    ),
+    Opportunity(
+        id: UUID(),
+        imageName: "meropriyatiya",
+        category: .meetups,
+        title: "IT-конференция CodeConf 2026",
+        summary: "Конференция для разработчиков с докладами от лидеров индустрии.",
+        details: "В программе — инженерные доклады, практические секции, карьерная зона и встречи с представителями технологических компаний.",
+        themeColor: .primaryBlue,
+        mapColor: .blue,
+        dateText: "22 — 23 августа",
+        deadlineText: "15 августа 2026",
+        participantCount: 142,
+        locationName: "Минск, Беларусь",
+        status: "РЕГИСТРАЦИЯ",
+        reward: nil,
+        organizer: "CodeConf",
+        latitude: nil,
+        longitude: nil
+    )
 ]
-    
-
-
-

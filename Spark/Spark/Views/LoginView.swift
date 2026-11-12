@@ -14,6 +14,8 @@ struct LoginView: View {
     @State private var userEmail: String = ""
     @State private var userPassword: String = ""
     @State private var showHome = false
+    @State private var showBiometricOffer = false
+    @State private var authStore = AuthStore()
     
     var body: some View {
         
@@ -31,7 +33,7 @@ struct LoginView: View {
                 
                 .frame(height: 300)
                 
-                Color.primaryWhite
+                Color(.systemBackground)
             }
             
             .ignoresSafeArea(edges: .top)
@@ -93,7 +95,9 @@ struct LoginView: View {
                     Spacer()
                     HStack{
                         
-                        Button{ selectedTab = 0
+                        Button{
+                            authStore.clearError()
+                            selectedTab = 0
                             
                         }label: {
                             Text("Вход")
@@ -108,7 +112,9 @@ struct LoginView: View {
                             
                             
                         }
-                        Button { selectedTab = 1
+                        Button {
+                            authStore.clearError()
+                            selectedTab = 1
                         }label: {
                             Text("Регистрация")
                                 .font(.system(size: 16, weight: .semibold))
@@ -125,7 +131,7 @@ struct LoginView: View {
                         }
                     }
                     .padding(6)
-                    .background(.primaryWhite)
+                    .background(SparkColor.surface.color)
                     .cornerRadius(20)
                     .shadow(color: .black.opacity(0.25),
                             radius: 4,
@@ -135,7 +141,20 @@ struct LoginView: View {
                     
                     VStack{
                         
-                        Button{}
+                        Button {
+                            Task {
+                                let succeeded = await authStore.authenticateWithGoogle(
+                                    isRegistration: selectedTab == 1
+                                )
+                                if succeeded {
+                                    if authStore.canUseBiometrics && !authStore.isBiometricEnabled {
+                                        showBiometricOffer = true
+                                    } else {
+                                        showHome = true
+                                    }
+                                }
+                            }
+                        }
                         label: {
                             HStack(spacing: 10){
                                 Image("Google")
@@ -149,7 +168,7 @@ struct LoginView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 45)
-                            .background(Color(.primaryWhite))
+                            .background(SparkColor.surface.color)
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                             .overlay(RoundedRectangle(cornerRadius: 16)
                                 .stroke(.primaryGrey1.opacity(0.3), lineWidth: 1))
@@ -159,7 +178,9 @@ struct LoginView: View {
                                     y: 5)
                             
                             
-                        } .padding(.bottom, 10)
+                        }
+                        .disabled(authStore.isLoading)
+                        .padding(.bottom, 10)
                         
                         HStack{
                             Rectangle()
@@ -184,7 +205,7 @@ struct LoginView: View {
                                            iconSize: 18,
                                            placeholder: "Email",
                                            borderColor: .grey,
-                                           backgroundColor: .white,
+                                           backgroundColor: .surface,
                                            isSecure: false,
                                            text: $userEmail).padding(.bottom, 5)
                             
@@ -193,7 +214,7 @@ struct LoginView: View {
                                            iconSize: 18,
                                            placeholder: "Пароль",
                                            borderColor: .grey,
-                                           backgroundColor: .white,
+                                           backgroundColor: .surface,
                                            isSecure: true,
                                            text: $userPassword).padding(.bottom, 5)
                             HStack{
@@ -207,9 +228,41 @@ struct LoginView: View {
                             }
                             
                             
-                            SparkButton(title: "Войти", icon: "arrow.forward", backgroundColor: .litePurple, isInfinity: true) {
-                                showHome = true
+                            if let errorMessage = authStore.errorMessage {
+                                Text(errorMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(.red)
                             }
+
+                            if authStore.isAuthenticated && authStore.isBiometricEnabled {
+                                Button {
+                                    Task {
+                                        showHome = await authStore.unlockWithBiometrics()
+                                    }
+                                } label: {
+                                    Label("Разблокировать через Face ID", systemImage: "faceid")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(.primaryLitePurple)
+                            }
+
+                            SparkButton(title: "Войти", icon: "arrow.forward", backgroundColor: .litePurple, isInfinity: true) {
+                                Task {
+                                    let succeeded = await authStore.login(
+                                        email: userEmail,
+                                        password: userPassword
+                                    )
+                                    if succeeded {
+                                        if authStore.canUseBiometrics && !authStore.isBiometricEnabled {
+                                            showBiometricOffer = true
+                                        } else {
+                                            showHome = true
+                                        }
+                                    }
+                                }
+                            }
+                            .disabled(authStore.isLoading)
                             
                             
                             HStack{
@@ -218,7 +271,9 @@ struct LoginView: View {
                                 Text("Нет аккаунта?")
                                     .foregroundColor(.primaryGrey1)
                                 
-                                Button{}
+                                Button {
+                                    selectedTab = 1
+                                }
                                 label: {
                                     Text("Зарегистрироваться")
                                         .foregroundColor(.primaryLitePurple)
@@ -238,14 +293,17 @@ struct LoginView: View {
                                 
                                 Spacer()
                                 
-                                Button{}
+                                Button {
+                                    authStore.continueAsGuest()
+                                    showHome = true
+                                }
                                 label: {
                                     Image(systemName: "arrow.forward")
-                                        .foregroundColor(.primaryGrey1.opacity(0.6))
+                                        .foregroundColor(.primaryGrey1.opacity(0.8))
                                         .rotationEffect(.degrees(180))
                                         .fontWeight(.medium)
-                                    Text("Пропустить и посмотреть приложеие")
-                                        .foregroundStyle(.primaryGrey1.opacity(0.6))
+                                    Text("Пропустить и посмотреть приложение")
+                                        .foregroundStyle(.primaryGrey1.opacity(0.8))
                                         .font(.system(size: 14))
                                         
                                     
@@ -261,7 +319,7 @@ struct LoginView: View {
                                            iconSize: 18,
                                            placeholder: "Имя",
                                            borderColor: .grey,
-                                           backgroundColor: .white,
+                                           backgroundColor: .surface,
                                            isSecure: false,
                                            text: $userName).padding(.bottom, 5)
                             
@@ -270,7 +328,7 @@ struct LoginView: View {
                                            iconSize: 18,
                                            placeholder: "Email",
                                            borderColor: .grey,
-                                           backgroundColor: .white,
+                                           backgroundColor: .surface,
                                            isSecure: false,
                                            text: $userEmail).padding(.bottom, 5)
                             
@@ -279,12 +337,32 @@ struct LoginView: View {
                                            iconSize: 18,
                                            placeholder: "Пароль",
                                            borderColor: .grey,
-                                           backgroundColor: .white,
+                                           backgroundColor: .surface,
                                            isSecure: true,
                                            text: $userPassword).padding(.bottom, 5)
-                            SparkButton(title: "Зарегистрироваться", icon: "arrow.forward", backgroundColor: .litePurple, isInfinity: true) {
-                                showHome = true
+                            if let errorMessage = authStore.errorMessage {
+                                Text(errorMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(.red)
                             }
+
+                            SparkButton(title: "Зарегистрироваться", icon: "arrow.forward", backgroundColor: .litePurple, isInfinity: true) {
+                                Task {
+                                    let succeeded = await authStore.register(
+                                        name: userName,
+                                        email: userEmail,
+                                        password: userPassword
+                                    )
+                                    if succeeded {
+                                        if authStore.canUseBiometrics && !authStore.isBiometricEnabled {
+                                            showBiometricOffer = true
+                                        } else {
+                                            showHome = true
+                                        }
+                                    }
+                                }
+                            }
+                            .disabled(authStore.isLoading)
                             
                             
                             HStack{
@@ -293,7 +371,9 @@ struct LoginView: View {
                                 Text("Уже с нами?")
                                     .foregroundColor(.primaryGrey1)
                                 
-                                Button{}
+                                Button {
+                                    selectedTab = 0
+                                }
                                 label: {
                                     Text("Войти")
                                         .foregroundColor(.primaryLitePurple)
@@ -313,14 +393,17 @@ struct LoginView: View {
                                 
                                 Spacer()
                                 
-                                Button{}
+                                Button {
+                                    authStore.continueAsGuest()
+                                    showHome = true
+                                }
                                 label: {
                                     Image(systemName: "arrow.forward")
-                                        .foregroundColor(.primaryGrey1.opacity(0.6))
+                                        .foregroundColor(.primaryGrey1.opacity(0.8))
                                         .rotationEffect(.degrees(180))
                                         .fontWeight(.medium)
-                                    Text("Пропустить и посмотреть приложеие")
-                                        .foregroundStyle(.primaryGrey1.opacity(0.6))
+                                    Text("Пропустить и посмотреть приложение")
+                                        .foregroundStyle(.primaryGrey1.opacity(0.8))
                                         .font(.system(size: 14))
                                     
                                 }
@@ -337,17 +420,56 @@ struct LoginView: View {
             } .padding(.horizontal, 28)
                 .frame(maxWidth: .infinity,alignment: .leading)
             
-        }.navigationDestination(isPresented: $showHome){
-            MainTabView()
-            
+        }
+        .fullScreenCover(isPresented: $showHome) {
+            MainTabView(
+                accessToken: authStore.accessToken,
+                isBiometricEnabled: authStore.isBiometricEnabled,
+                canUseBiometrics: authStore.canUseBiometrics,
+                onBiometricChange: { enabled in
+                    await authStore.setBiometricEnabled(enabled)
+                }
+            ) {
+                authStore.logout()
+                showHome = false
+            }
+        }
+        .alert("Включить Face ID?", isPresented: $showBiometricOffer) {
+            Button("Не сейчас") {
+                showHome = true
+            }
+            Button("Включить") {
+                Task {
+                    _ = await authStore.setBiometricEnabled(true)
+                    showHome = true
+                }
+            }
+        } message: {
+            Text("Используйте Face ID или код-пароль устройства для быстрой разблокировки Spark.")
         }
         .navigationBarBackButtonHidden(true)
+        .onChange(of: userName) { _, _ in
+            authStore.clearError()
+        }
+        .onChange(of: userEmail) { _, _ in
+            authStore.clearError()
+        }
+        .onChange(of: userPassword) { _, _ in
+            authStore.clearError()
+        }
+        .task {
+            authStore.clearError()
+            if authStore.isAuthenticated && authStore.isBiometricEnabled {
+                showHome = await authStore.unlockWithBiometrics()
+            } else {
+                showHome = authStore.isAuthenticated
+            }
+        }
         }
         
         }
         
     }
-
 
 #Preview {
     LoginView()

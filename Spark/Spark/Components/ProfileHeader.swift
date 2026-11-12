@@ -8,6 +8,11 @@
 import SwiftUI
 
 struct ProfileHeader: View {
+    let avatarImage: UIImage?
+    let canEditAvatar: Bool
+    let onAvatarSelected: (Data) -> Void
+    let onSettings: () -> Void
+
     var body: some View {
         
         ZStack{
@@ -36,8 +41,7 @@ struct ProfileHeader: View {
                         
                         Spacer()
                         
-                        Button{}
-                        label: {
+                        Button(action: onSettings) {
                             ZStack {
                                 
                                 Rectangle()
@@ -64,12 +68,21 @@ struct ProfileHeader: View {
                 
             }
             
-         ProfileAvatar()
+            ProfileAvatar(
+                image: avatarImage,
+                canEdit: canEditAvatar,
+                onImageSelected: onAvatarSelected
+            )
    
         }.frame(height: 150)
     }
 }
 
 #Preview {
-    ProfileHeader()
+    ProfileHeader(
+        avatarImage: nil,
+        canEditAvatar: true,
+        onAvatarSelected: { _ in },
+        onSettings: {}
+    )
 }

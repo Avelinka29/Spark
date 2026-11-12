@@ -13,8 +13,9 @@ struct CardActiveProject: View {
     let color: SparkColor
     let title: String
     let description: String
+    let isAuthenticated: Bool
     
-    let colomns = [
+    private let columns = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
     ]
@@ -34,101 +35,102 @@ struct CardActiveProject: View {
     var body: some View {
         
         
-        ZStack{
-            
-            VStack(alignment: .leading, spacing: 6) {
-                
-                
-                VStack{
-                    Text("\(category)")
-                }.font(.system(size: 14, weight: .bold))
+        VStack(alignment: .leading, spacing: 14) {
+            Text(category)
+                .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.primaryWhite)
                     .opacity(0.6)
-                    .padding(.vertical, 10)
-                
-                VStack {
-                    Text("\(title)")
-                }.font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.primaryWhite)
-                
-                VStack {
-                    Text("\(description)")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.primaryWhite)
-                        .opacity(0.7)
-                        .lineSpacing(4)
-                        .padding(.bottom, 10)
-                }
-                
-                
-                
-                
-                LazyVGrid(columns: colomns, spacing: 12) {
-                    
-                    ForEach(vacancies) {vacancy in
-                        
-                        ActiveProject(color: .white, imageName: vacancy.imageName, title: vacancy.title, status: vacancy.status, type: .role(vacancy.roleDescription), isActive: vacancy.isActive, strokeWidht: 3, titleSize: 14)
-                        
-                        
+
+            Text(title)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(.primaryWhite)
+
+            Text(description)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primaryWhite.opacity(0.72))
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !vacancies.isEmpty {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(vacancies) { vacancy in
+                        ProjectRoleCard(vacancy: vacancy)
                     }
-                    
                 }
-                
-                HStack {
-                    Text("\(countOpen) открыто")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.primaryYellow)
-                    
-                    Text("\(countClose) занято")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.primaryWhite.opacity(0.6))
-                    
-                    Spacer()
-                    
-                    Button{}
-                    label: {
-                        HStack(spacing: 10){
-                            
-                            Text("Присоединиться")
-                                .foregroundColor(.primaryWhite)
-                                .font(.system(size: 16, weight: .semibold))
-                                .padding(.horizontal, 16)
-                            
-                        }
-                        .frame(width: 170)
-                        .frame(height: 35)
-                        .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10)
-                            .stroke(.primaryWhite, lineWidth: 1))
-                        .shadow(color: .black.opacity(0.2),
-                                radius: 4,
-                                x: 0,
-                                y: 5)
-                        
-                        
-                    }.frame(maxWidth: .infinity, alignment: .trailing)
-                    
-                    
-                    
-                }.padding(.top, 10)
-                
-                
-                
-                
-            }.frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 20)
-                .padding(.horizontal, 10)
-                .background(color.color)
-                .cornerRadius(20)
+            }
+
+            HStack(spacing: 8) {
+                Text("\(countOpen) открыто")
+                    .foregroundStyle(.primaryYellow)
+
+                Text("\(countClose) занято")
+                    .foregroundStyle(.primaryWhite.opacity(0.6))
+
+                Spacer(minLength: 8)
+
+                Label(
+                    isAuthenticated ? "Подробнее" : "Войдите",
+                    systemImage: isAuthenticated ? "arrow.right" : "lock"
+                )
+                .foregroundStyle(.primaryWhite)
+                .font(.system(size: 15, weight: .semibold))
+                .padding(.horizontal, 14)
+                .frame(minHeight: 40)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(.primaryWhite, lineWidth: 1)
+                }
+            }
+            .font(.system(size: 16, weight: .bold))
         }
-       
-        
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .background(color.color)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+    }
+}
+
+private struct ProjectRoleCard: View {
+    let vacancy: Vacancy
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(vacancy.title, systemImage: vacancy.imageName)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.primaryWhite.opacity(0.72))
+                .lineLimit(2)
+
+            Text(vacancy.roleDescription)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.primaryWhite)
+                .lineLimit(2)
+
+            Text(vacancy.status)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.primaryWhite.opacity(0.72))
+                .padding(.top, 2)
+        }
+        .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
+        .padding(14)
+        .background(
+            vacancy.isActive
+                ? Color.white.opacity(0.18)
+                : Color.black.opacity(0.16)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            if vacancy.isActive {
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(.primaryWhite.opacity(0.32), lineWidth: 2)
+            }
+        }
     }
 }
 
 #Preview {
-    CardActiveProject(category: "EDTECH", color: .litePurple, title: "EduScan: AI-помощник для школьников", description: "Мобильное приложение, которое помогает школьникам готовиться к ЦТ и ЦЭ с помощью ИИ. Распознаёт задания по фото", vacancies:  [
+    CardActiveProject(category: "EDTECH", color: .litePurple, title: "EduScan: AI-помощник для школьников", description: "Мобильное приложение, которое помогает школьникам готовиться к ЦТ и ЦЭ с помощью ИИ. Распознаёт задания по фото", isAuthenticated: false, vacancies:  [
         Vacancy(title: "Flutter Developer", imageName: "terminal", status: "НУЖЕН", roleDescription: "Dart/Firebase", isActive: true),
         Vacancy(title: "ML Engineer", imageName: "terminal", status: "НУЖЕН", roleDescription: "Python/PyTorch", isActive: true),
         Vacancy(title: "UI/UX Designer", imageName: "terminal", status: "ЗАНЯТО", roleDescription: "Figma/Прототипирование", isActive: false),

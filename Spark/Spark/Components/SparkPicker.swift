@@ -28,7 +28,7 @@ struct SparkPicker: View {
             } label: {
                 HStack {
                     Text(selection.isEmpty ? title : selection)
-                        .foregroundStyle(selection.isEmpty ? .primaryGrey1: .black)
+                        .foregroundStyle(selection.isEmpty ? Color.primaryGrey1 : Color.primary)
                     
                     Spacer()
                     
@@ -40,7 +40,7 @@ struct SparkPicker: View {
                 
                 .padding()
                     .frame(height: 35)
-                    .background(.white)
+                    .background(Color(.secondarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .shadow(color: .black.opacity(0.25),
                             radius: 10,

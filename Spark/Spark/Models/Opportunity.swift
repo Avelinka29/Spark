@@ -1,27 +1,34 @@
-//
-//  ResultMapModel.swift
-//  Spark
-//
-//  Created by Avelina Maksimchik on 08.07.2026.
-//
-
+import Foundation
 import MapKit
 import SwiftUI
 
 struct Opportunity: Identifiable {
-
-    let id = UUID()
-
-    let title: String
-    let description: String
+    let id: UUID
+    let imageName: String
     let category: EventCategory
+    let title: String
+    let summary: String
+    let details: String
+    let themeColor: Color
+    let mapColor: SparkColor
+    let dateText: String
+    let deadlineText: String
+    let participantCount: Int?
+    let locationName: String
+    let status: String?
+    let reward: Int?
+    let organizer: String
+    let latitude: Double?
+    let longitude: Double?
 
-    let coordinate: CLLocationCoordinate2D
-    let address: String
+    var coordinate: CLLocationCoordinate2D? {
+        guard let latitude, let longitude else {
+            return nil
+        }
 
-    let color: SparkColor
-    
-    
+        return CLLocationCoordinate2D(
+            latitude: latitude,
+            longitude: longitude
+        )
+    }
 }
-
-

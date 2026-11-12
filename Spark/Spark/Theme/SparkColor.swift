@@ -10,6 +10,7 @@ import SwiftUI
     enum SparkColor {
         
         case white
+        case surface
         case black
         case grey
         case litePurple
@@ -23,6 +24,8 @@ import SwiftUI
             switch self {
             case .white:
                 return .primaryWhite
+            case .surface:
+                return Color(.secondarySystemBackground)
             case .black:
                 return .black
             case .grey:
