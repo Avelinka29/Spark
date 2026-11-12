@@ -17,7 +17,7 @@ final class OpportunitiesViewModel {
     private(set) var isLoading = false
     private(set) var errorMessage: String?
 
-    init(opportunities: [Opportunity] = mockOpportunities) {
+    init(opportunities: [Opportunity] = []) {
         self.opportunities = opportunities
         self.visibleOpportunities = opportunities
     }
@@ -34,7 +34,9 @@ final class OpportunitiesViewModel {
             opportunities = response.map { $0.makeOpportunity() }
             updateVisibleOpportunities()
         } catch {
-            errorMessage = "Сервер недоступен — показаны демонстрационные данные."
+            opportunities = []
+            visibleOpportunities = []
+            errorMessage = "Не удалось загрузить возможности с сервера."
         }
     }
 

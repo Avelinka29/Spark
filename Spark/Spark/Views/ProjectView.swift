@@ -247,5 +247,8 @@ private struct MyApplications: View {
 }
 
 #Preview {
-    ProjectView(store: ProjectStore(), currentUserID: nil)
+    ProjectView(
+        store: ProjectStore(projects: mockProjects),
+        currentUserID: nil
+    )
 }

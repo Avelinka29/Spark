@@ -14,7 +14,7 @@ final class ProjectStore {
 
     var isAuthenticated: Bool { token != nil }
 
-    init(token: String? = nil, projects: [Project] = mockProjects) {
+    init(token: String? = nil, projects: [Project] = []) {
         self.token = token
         self.projects = projects
     }
