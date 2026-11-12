@@ -11,11 +11,13 @@ from starlette.concurrency import run_in_threadpool
 
 from .config import get_settings
 from .database import get_session
-from .models import Application, ApplicationStatus, Bookmark, Opportunity, Project, ProjectRole, User
+from .models import Achievement, Application, ApplicationStatus, Bookmark, Opportunity, Project, ProjectRole, User
 from .schemas import (
     LoginRequest,
     ApplicationResponse,
     ApplicationStatusUpdate,
+    AchievementCreate,
+    AchievementResponse,
     GoogleAuthRequest,
     OpportunityResponse,
     ProfileResponse,
@@ -392,3 +394,48 @@ async def cancel_application(
 @app.get("/api/v1/profile/me", response_model=ProfileResponse)
 async def my_profile(user: User = Depends(current_user)) -> User:
     return user
+
+
+@app.get("/api/v1/achievements", response_model=list[AchievementResponse])
+async def list_achievements(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[Achievement]:
+    query = (
+        select(Achievement)
+        .where(Achievement.user_id == user.id)
+        .order_by(Achievement.issued_at.desc())
+    )
+    return list((await session.scalars(query)).all())
+
+
+@app.post(
+    "/api/v1/achievements",
+    response_model=AchievementResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_achievement(
+    payload: AchievementCreate,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Achievement:
+    achievement = Achievement(user_id=user.id, **payload.model_dump())
+    session.add(achievement)
+    await session.commit()
+    await session.refresh(achievement)
+    return achievement
+
+
+@app.delete("/api/v1/achievements/{achievement_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_achievement(
+    achievement_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    achievement = await session.get(Achievement, achievement_id)
+    if achievement is None:
+        raise HTTPException(status_code=404, detail="Achievement not found")
+    if achievement.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Achievement belongs to another user")
+    await session.delete(achievement)
+    await session.commit()

@@ -104,3 +104,15 @@ class ProfileResponse(BaseModel):
     bio: str
     skills: list[str]
     interests: list[str]
+
+
+class AchievementCreate(BaseModel):
+    title: str = Field(min_length=2, max_length=200)
+    issuer: str = Field(min_length=2, max_length=160)
+    issued_at: date
+
+
+class AchievementResponse(AchievementCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID

@@ -38,6 +38,28 @@ def test_full_user_scenario() -> None:
             assert profile.status_code == 200
             assert profile.json()["email"] == email
 
+            achievement = client.post(
+                "/api/v1/achievements",
+                headers=headers,
+                json={
+                    "title": "Hackathon Finalist",
+                    "issuer": "Spark Test",
+                    "issued_at": "2026-11-12",
+                },
+            )
+            assert achievement.status_code == 201
+            achievement_id = achievement.json()["id"]
+
+            achievements = client.get("/api/v1/achievements", headers=headers)
+            assert achievements.status_code == 200
+            assert achievement_id in {item["id"] for item in achievements.json()}
+
+            deleted_achievement = client.delete(
+                f"/api/v1/achievements/{achievement_id}",
+                headers=headers,
+            )
+            assert deleted_achievement.status_code == 204
+
             bookmark = client.post(
                 f"/api/v1/opportunities/{opportunity_id}/bookmark",
                 headers=headers,

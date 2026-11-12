@@ -175,6 +175,38 @@ struct ProfileDTO: Decodable {
     }
 }
 
+struct AchievementDTO: Identifiable, Codable {
+    let id: UUID?
+    let title: String
+    let issuer: String
+    let issuedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, issuer
+        case issuedAt = "issued_at"
+    }
+
+    func makeAchievement() -> Achievement? {
+        let components = issuedAt.split(separator: "-").compactMap { Int($0) }
+        guard components.count == 3,
+              let date = Calendar.current.date(
+                from: DateComponents(
+                    year: components[0],
+                    month: components[1],
+                    day: components[2]
+                )
+              ) else {
+            return nil
+        }
+        return Achievement(
+            id: id ?? UUID(),
+            title: title,
+            issuer: issuer,
+            issuedAt: date
+        )
+    }
+}
+
 private extension EventCategory {
     var presentation: (color: SparkColor, imageName: String) {
         switch self {

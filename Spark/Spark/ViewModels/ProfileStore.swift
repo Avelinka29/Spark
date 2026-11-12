@@ -33,11 +33,55 @@ final class ProfileStore {
                 path: "profile/me",
                 token: token
             )
-            let loadedProfile = response.makeProfile()
+            async let achievementResponse: [AchievementDTO] = APIClient.shared.send(
+                path: "achievements",
+                token: token
+            )
+            var loadedProfile = response.makeProfile()
+            loadedProfile.achievements = try await achievementResponse.compactMap {
+                $0.makeAchievement()
+            }
             profile = loadedProfile
             avatarImage = loadAvatar(userID: loadedProfile.id)
         } catch {
             profile = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func addAchievement(title: String, issuer: String, date: Date) async -> Bool {
+        guard let token else { return false }
+        let payload = AchievementDTO(
+            id: nil,
+            title: title,
+            issuer: issuer,
+            issuedAt: date.formatted(.iso8601.year().month().day())
+        )
+        do {
+            let _: AchievementDTO = try await APIClient.shared.send(
+                path: "achievements",
+                method: "POST",
+                body: payload,
+                token: token
+            )
+            await load()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func deleteAchievement(id: UUID) async {
+        guard let token else { return }
+        do {
+            let _: EmptyResponse = try await APIClient.shared.send(
+                path: "achievements/\(id)",
+                method: "DELETE",
+                token: token
+            )
+            profile?.achievements.removeAll { $0.id == id }
+        } catch {
             errorMessage = error.localizedDescription
         }
     }

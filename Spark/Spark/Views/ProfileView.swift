@@ -16,6 +16,8 @@ struct ProfileView: View {
                         avatarImage: store.avatarImage,
                         canEditAvatar: store.isAuthenticated,
                         onAvatarSelected: store.updateAvatar,
+                        onAddAchievement: store.addAchievement,
+                        onDeleteAchievement: store.deleteAchievement,
                         isBiometricEnabled: isBiometricEnabled,
                         canUseBiometrics: canUseBiometrics,
                         onBiometricChange: onBiometricChange,
@@ -54,12 +56,15 @@ private struct ProfileContent: View {
     let avatarImage: UIImage?
     let canEditAvatar: Bool
     let onAvatarSelected: (Data) -> Void
+    let onAddAchievement: (String, String, Date) async -> Bool
+    let onDeleteAchievement: (UUID) async -> Void
     let isBiometricEnabled: Bool
     let canUseBiometrics: Bool
     let onBiometricChange: (Bool) async -> Bool
     let onLogout: () -> Void
 
     @State private var showSettings = false
+    @State private var showAchievementForm = false
 
     var body: some View {
         ScrollView {
@@ -79,7 +84,12 @@ private struct ProfileContent: View {
 
                 ProfileTagsSection(title: "Навыки", tags: profile.skills)
                 ProfileTagsSection(title: "Интересы", tags: profile.interests)
-                AchievementSection(achievements: profile.achievements)
+                AchievementSection(
+                    achievements: profile.achievements,
+                    canEdit: canEditAvatar,
+                    onAdd: { showAchievementForm = true },
+                    onDelete: onDeleteAchievement
+                )
             }
             .padding(.bottom, 32)
         }
@@ -96,6 +106,15 @@ private struct ProfileContent: View {
                         onLogout()
                     }
                 }
+        }
+        .sheet(isPresented: $showAchievementForm) {
+            AchievementForm { title, issuer, date in
+                let saved = await onAddAchievement(title, issuer, date)
+                if saved {
+                    showAchievementForm = false
+                }
+                return saved
+            }
         }
     }
 }
@@ -223,11 +242,23 @@ private struct ProfileTagsSection: View {
 
 private struct AchievementSection: View {
     let achievements: [Achievement]
+    let canEdit: Bool
+    let onAdd: () -> Void
+    let onDelete: (UUID) async -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Достижения")
-                .font(.title3.bold())
+            HStack {
+                Text("Достижения")
+                    .font(.title3.bold())
+                Spacer()
+                if canEdit {
+                    Button(action: onAdd) {
+                        Label("Добавить", systemImage: "plus")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                }
+            }
 
             if achievements.isEmpty {
                 Text("Достижения появятся после участия в возможностях и проектах.")
@@ -251,6 +282,15 @@ private struct AchievementSection: View {
                         Text(achievement.issuedAt, format: .dateTime.year())
                             .font(.caption)
                             .foregroundStyle(.secondary)
+
+                        if canEdit {
+                            Button(role: .destructive) {
+                                Task { await onDelete(achievement.id) }
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     .padding()
                     .background(.thinMaterial)
@@ -259,6 +299,52 @@ private struct AchievementSection: View {
             }
         }
         .padding(.horizontal)
+    }
+}
+
+private struct AchievementForm: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let onSave: (String, String, Date) async -> Bool
+
+    @State private var title = ""
+    @State private var issuer = ""
+    @State private var issuedAt = Date()
+    @State private var isSaving = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Название достижения", text: $title)
+                TextField("Организатор", text: $issuer)
+                DatePicker("Дата получения", selection: $issuedAt, displayedComponents: .date)
+            }
+            .navigationTitle("Новое достижение")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Сохранить") {
+                        Task {
+                            isSaving = true
+                            _ = await onSave(
+                                title.trimmingCharacters(in: .whitespacesAndNewlines),
+                                issuer.trimmingCharacters(in: .whitespacesAndNewlines),
+                                issuedAt
+                            )
+                            isSaving = false
+                        }
+                    }
+                    .disabled(
+                        isSaving ||
+                        title.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 ||
+                        issuer.trimmingCharacters(in: .whitespacesAndNewlines).count < 2
+                    )
+                }
+            }
+        }
     }
 }
 
