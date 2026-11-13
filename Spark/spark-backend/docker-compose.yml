@@ -25,6 +25,12 @@ services:
       JWT_SECRET: local-development-secret-replace-in-production
       ACCESS_TOKEN_MINUTES: 30
       GOOGLE_WEB_CLIENT_ID: 1089503089556-asefglffks4sun71ho9sgd9ehrclsn88.apps.googleusercontent.com
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SENDER: ${SMTP_SENDER:-}
+      ALLOW_DEVELOPMENT_CODES: ${ALLOW_DEVELOPMENT_CODES:-true}
     ports:
       - "8000:8000"
     depends_on:

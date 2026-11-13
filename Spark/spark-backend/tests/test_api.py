@@ -31,8 +31,43 @@ def test_full_user_scenario() -> None:
                 json={"email": email, "password": "spark-test-password", "name": "Spark Test"},
             )
             assert registration.status_code == 201
-            token = registration.json()["access_token"]
+            verification_code = registration.json()["development_code"]
+            assert verification_code
+
+            verification = client.post(
+                "/api/v1/auth/verify-email",
+                json={"email": email, "code": verification_code},
+            )
+            assert verification.status_code == 200
+
+            login = client.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": "spark-test-password"},
+            )
+            assert login.status_code == 200
+            token = login.json()["access_token"]
             headers = {"Authorization": f"Bearer {token}"}
+
+            forgot = client.post("/api/v1/auth/forgot-password", json={"email": email})
+            assert forgot.status_code == 200
+            reset_code = forgot.json()["development_code"]
+            assert reset_code
+
+            reset = client.post(
+                "/api/v1/auth/reset-password",
+                json={
+                    "email": email,
+                    "code": reset_code,
+                    "new_password": "spark-updated-password",
+                },
+            )
+            assert reset.status_code == 200
+
+            updated_login = client.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": "spark-updated-password"},
+            )
+            assert updated_login.status_code == 200
 
             profile = client.get("/api/v1/profile/me", headers=headers)
             assert profile.status_code == 200

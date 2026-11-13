@@ -8,6 +8,12 @@ class Settings(BaseSettings):
     jwt_secret: str = "development-secret-change-before-deploy"
     access_token_minutes: int = 30
     google_web_client_id: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_sender: str = ""
+    allow_development_codes: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

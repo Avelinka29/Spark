@@ -1,31 +1,39 @@
+import hashlib
+import secrets
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
-from sqlalchemy import or_, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
 
 from .config import get_settings
 from .database import get_session
-from .models import Achievement, Application, ApplicationStatus, Bookmark, Opportunity, Project, ProjectRole, User
+from .email_service import send_auth_code
+from .models import Achievement, Application, ApplicationStatus, AuthCode, AuthCodePurpose, Bookmark, Opportunity, Project, ProjectRole, User
 from .schemas import (
     LoginRequest,
     ApplicationResponse,
     ApplicationStatusUpdate,
     AchievementCreate,
     AchievementResponse,
+    EmailRequest,
     GoogleAuthRequest,
+    MessageResponse,
     OpportunityResponse,
     ProfileResponse,
     ProjectCreate,
     ProjectResponse,
     ProjectUpdate,
     RegisterRequest,
+    ResetPasswordRequest,
     TokenResponse,
+    VerifyCodeRequest,
 )
 from .security import create_access_token, current_user, hash_password, verify_password
 
@@ -38,8 +46,60 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/api/v1/auth/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(payload: RegisterRequest, session: AsyncSession = Depends(get_session)) -> TokenResponse:
+def hash_auth_code(code: str) -> str:
+    value = f"{code}:{get_settings().jwt_secret}".encode()
+    return hashlib.sha256(value).hexdigest()
+
+
+async def issue_auth_code(
+    session: AsyncSession,
+    user: User,
+    purpose: AuthCodePurpose,
+) -> str:
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    await session.execute(
+        delete(AuthCode).where(AuthCode.user_id == user.id, AuthCode.purpose == purpose)
+    )
+    session.add(
+        AuthCode(
+            user_id=user.id,
+            purpose=purpose,
+            code_hash=hash_auth_code(code),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+        )
+    )
+    await session.commit()
+    return code
+
+
+async def deliver_auth_code(email: str, code: str, purpose: AuthCodePurpose) -> str | None:
+    delivered = await send_auth_code(email, code, purpose.value)
+    settings = get_settings()
+    if not delivered and not settings.allow_development_codes:
+        raise HTTPException(status_code=503, detail="Email delivery is not configured")
+    return code if settings.allow_development_codes else None
+
+
+async def valid_auth_code(
+    session: AsyncSession,
+    user: User,
+    purpose: AuthCodePurpose,
+    code: str,
+) -> AuthCode:
+    auth_code = await session.scalar(
+        select(AuthCode).where(AuthCode.user_id == user.id, AuthCode.purpose == purpose)
+    )
+    if (
+        auth_code is None
+        or auth_code.expires_at < datetime.now(timezone.utc)
+        or not secrets.compare_digest(auth_code.code_hash, hash_auth_code(code))
+    ):
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+    return auth_code
+
+
+@app.post("/api/v1/auth/register", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
+async def register(payload: RegisterRequest, session: AsyncSession = Depends(get_session)) -> MessageResponse:
     existing = await session.scalar(select(User).where(User.email == payload.email.lower()))
     if existing is not None:
         raise HTTPException(status_code=409, detail="Email is already registered")
@@ -48,11 +108,14 @@ async def register(payload: RegisterRequest, session: AsyncSession = Depends(get
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
         name=payload.name,
+        email_verified=False,
     )
     session.add(user)
     await session.commit()
     await session.refresh(user)
-    return TokenResponse(access_token=create_access_token(user.id))
+    code = await issue_auth_code(session, user, AuthCodePurpose.verify_email)
+    development_code = await deliver_auth_code(user.email, code, AuthCodePurpose.verify_email)
+    return MessageResponse(message="Verification code sent", development_code=development_code)
 
 
 @app.post("/api/v1/auth/login", response_model=TokenResponse)
@@ -60,7 +123,53 @@ async def login(payload: LoginRequest, session: AsyncSession = Depends(get_sessi
     user = await session.scalar(select(User).where(User.email == payload.email.lower()))
     if user is None or user.password_hash is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not user.email_verified:
+        raise HTTPException(status_code=403, detail="Email is not verified")
     return TokenResponse(access_token=create_access_token(user.id))
+
+
+@app.post("/api/v1/auth/verify-email", response_model=MessageResponse)
+async def verify_email(payload: VerifyCodeRequest, session: AsyncSession = Depends(get_session)) -> MessageResponse:
+    user = await session.scalar(select(User).where(User.email == payload.email.lower()))
+    if user is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+    auth_code = await valid_auth_code(session, user, AuthCodePurpose.verify_email, payload.code)
+    user.email_verified = True
+    await session.delete(auth_code)
+    await session.commit()
+    return MessageResponse(message="Email verified")
+
+
+@app.post("/api/v1/auth/resend-verification", response_model=MessageResponse)
+async def resend_verification(payload: EmailRequest, session: AsyncSession = Depends(get_session)) -> MessageResponse:
+    user = await session.scalar(select(User).where(User.email == payload.email.lower()))
+    if user is None or user.email_verified:
+        return MessageResponse(message="If verification is required, a code was sent")
+    code = await issue_auth_code(session, user, AuthCodePurpose.verify_email)
+    development_code = await deliver_auth_code(user.email, code, AuthCodePurpose.verify_email)
+    return MessageResponse(message="Verification code sent", development_code=development_code)
+
+
+@app.post("/api/v1/auth/forgot-password", response_model=MessageResponse)
+async def forgot_password(payload: EmailRequest, session: AsyncSession = Depends(get_session)) -> MessageResponse:
+    user = await session.scalar(select(User).where(User.email == payload.email.lower()))
+    if user is None or user.password_hash is None:
+        return MessageResponse(message="If the account exists, a reset code was sent")
+    code = await issue_auth_code(session, user, AuthCodePurpose.password_reset)
+    development_code = await deliver_auth_code(user.email, code, AuthCodePurpose.password_reset)
+    return MessageResponse(message="Password reset code sent", development_code=development_code)
+
+
+@app.post("/api/v1/auth/reset-password", response_model=MessageResponse)
+async def reset_password(payload: ResetPasswordRequest, session: AsyncSession = Depends(get_session)) -> MessageResponse:
+    user = await session.scalar(select(User).where(User.email == payload.email.lower()))
+    if user is None or user.password_hash is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+    auth_code = await valid_auth_code(session, user, AuthCodePurpose.password_reset, payload.code)
+    user.password_hash = hash_password(payload.new_password)
+    await session.delete(auth_code)
+    await session.commit()
+    return MessageResponse(message="Password updated")
 
 
 async def verified_google_identity(payload: GoogleAuthRequest) -> tuple[str, str, str]:
@@ -105,6 +214,7 @@ async def google_login(
 
     if user.google_sub is None:
         user.google_sub = subject
+        user.email_verified = True
         await session.commit()
         await session.refresh(user)
 
@@ -131,6 +241,7 @@ async def google_register(
         email=normalized_email,
         password_hash=None,
         google_sub=subject,
+        email_verified=True,
         name=name,
     )
     session.add(user)

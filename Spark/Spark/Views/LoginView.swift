@@ -15,6 +15,8 @@ struct LoginView: View {
     @State private var userPassword: String = ""
     @State private var showHome = false
     @State private var showBiometricOffer = false
+    @State private var showEmailVerification = false
+    @State private var showPasswordReset = false
     @State private var authStore = AuthStore()
     
     var body: some View {
@@ -219,7 +221,10 @@ struct LoginView: View {
                                            text: $userPassword).padding(.bottom, 5)
                             HStack{
                                 Spacer()
-                                Button{}
+                                Button {
+                                    authStore.clearError()
+                                    showPasswordReset = true
+                                }
                                 label: {
                                     Text("Забыли пароль?")
                                         .foregroundColor(.primaryLitePurple)
@@ -232,6 +237,11 @@ struct LoginView: View {
                                 Text(errorMessage)
                                     .font(.footnote)
                                     .foregroundStyle(.red)
+                                if errorMessage.contains("Подтвердите email") {
+                                    Button("Ввести код подтверждения") {
+                                        showEmailVerification = true
+                                    }
+                                }
                             }
 
                             if authStore.isAuthenticated && authStore.isBiometricEnabled {
@@ -254,11 +264,7 @@ struct LoginView: View {
                                         password: userPassword
                                     )
                                     if succeeded {
-                                        if authStore.canUseBiometrics && !authStore.isBiometricEnabled {
-                                            showBiometricOffer = true
-                                        } else {
-                                            showHome = true
-                                        }
+                                        showEmailVerification = true
                                     }
                                 }
                             }
@@ -437,6 +443,26 @@ struct LoginView: View {
         .sensoryFeedback(.success, trigger: showHome) { _, isPresented in
             isPresented
         }
+        .sheet(isPresented: $showEmailVerification) {
+            EmailVerificationSheet(
+                store: authStore,
+                email: userEmail,
+                password: userPassword
+            ) {
+                showEmailVerification = false
+                if authStore.canUseBiometrics && !authStore.isBiometricEnabled {
+                    showBiometricOffer = true
+                } else {
+                    showHome = true
+                }
+            }
+        }
+        .sheet(isPresented: $showPasswordReset) {
+            PasswordResetSheet(store: authStore, initialEmail: userEmail) {
+                showPasswordReset = false
+                selectedTab = 0
+            }
+        }
         .alert("Включить Face ID?", isPresented: $showBiometricOffer) {
             Button("Не сейчас") {
                 showHome = true
@@ -473,6 +499,132 @@ struct LoginView: View {
         }
         
     }
+
+private struct EmailVerificationSheet: View {
+    let store: AuthStore
+    let email: String
+    let password: String
+    let onVerified: () -> Void
+
+    @State private var code = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Мы отправили шестизначный код на \(email).")
+                    TextField("Код подтверждения", text: $code)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                }
+
+                if let developmentCode = store.developmentCode {
+                    Section("Локальная разработка") {
+                        Text("Код: \(developmentCode)")
+                            .textSelection(.enabled)
+                    }
+                }
+
+                if let error = store.errorMessage {
+                    Text(error).foregroundStyle(.red)
+                }
+
+                Button("Отправить код ещё раз") {
+                    Task { await store.resendVerification(email: email) }
+                }
+            }
+            .navigationTitle("Подтверждение email")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Подтвердить") {
+                        Task {
+                            if await store.verifyEmail(email: email, code: code, password: password) {
+                                onVerified()
+                            }
+                        }
+                    }
+                    .disabled(code.count != 6)
+                }
+            }
+        }
+        .interactiveDismissDisabled()
+    }
+}
+
+private struct PasswordResetSheet: View {
+    let store: AuthStore
+    let initialEmail: String
+    let onCompleted: () -> Void
+
+    @State private var email: String
+    @State private var code = ""
+    @State private var newPassword = ""
+    @State private var codeRequested = false
+
+    init(store: AuthStore, initialEmail: String, onCompleted: @escaping () -> Void) {
+        self.store = store
+        self.initialEmail = initialEmail
+        self.onCompleted = onCompleted
+        _email = State(initialValue: initialEmail)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Email", text: $email)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.emailAddress)
+
+                if codeRequested {
+                    TextField("Код из письма", text: $code)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                    SecureField("Новый пароль", text: $newPassword)
+                        .textContentType(.newPassword)
+
+                    if let developmentCode = store.developmentCode {
+                        Text("Локальный код: \(developmentCode)")
+                            .font(.footnote)
+                            .textSelection(.enabled)
+                    }
+                }
+
+                if let error = store.errorMessage {
+                    Text(error).foregroundStyle(.red)
+                }
+            }
+            .navigationTitle("Сброс пароля")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена", action: onCompleted)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if codeRequested {
+                        Button("Сохранить") {
+                            Task {
+                                if await store.resetPassword(
+                                    email: email,
+                                    code: code,
+                                    newPassword: newPassword
+                                ) {
+                                    onCompleted()
+                                }
+                            }
+                        }
+                        .disabled(code.count != 6 || newPassword.count < 8)
+                    } else {
+                        Button("Получить код") {
+                            Task {
+                                codeRequested = await store.requestPasswordReset(email: email)
+                            }
+                        }
+                        .disabled(email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+            }
+        }
+    }
+}
 
 #Preview {
     LoginView()

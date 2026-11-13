@@ -7,6 +7,7 @@ CREATE TABLE users (
     email VARCHAR(320) UNIQUE NOT NULL,
     password_hash TEXT,
     google_sub VARCHAR(255) UNIQUE,
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     name VARCHAR(120) NOT NULL,
     region VARCHAR(120) NOT NULL DEFAULT '',
     bio TEXT NOT NULL DEFAULT '',
@@ -14,6 +15,20 @@ CREATE TABLE users (
     interests VARCHAR[] NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TYPE authcodepurpose AS ENUM ('verify_email', 'password_reset');
+
+CREATE TABLE auth_codes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose authcodepurpose NOT NULL,
+    code_hash VARCHAR(64) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX ix_auth_codes_user_id ON auth_codes(user_id);
+CREATE INDEX ix_auth_codes_purpose ON auth_codes(purpose);
 
 CREATE TABLE opportunities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -17,6 +17,11 @@ class ApplicationStatus(str, enum.Enum):
     rejected = "rejected"
 
 
+class AuthCodePurpose(str, enum.Enum):
+    verify_email = "verify_email"
+    password_reset = "password_reset"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -24,11 +29,23 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     google_sub: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     name: Mapped[str] = mapped_column(String(120))
     region: Mapped[str] = mapped_column(String(120), default="")
     bio: Mapped[str] = mapped_column(Text, default="")
     skills: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     interests: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class AuthCode(Base):
+    __tablename__ = "auth_codes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    purpose: Mapped[AuthCodePurpose] = mapped_column(Enum(AuthCodePurpose), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 

@@ -12,6 +12,36 @@ struct RegisterRequest: Encodable {
     let name: String
 }
 
+struct EmailRequest: Encodable {
+    let email: String
+}
+
+struct VerifyCodeRequest: Encodable {
+    let email: String
+    let code: String
+}
+
+struct ResetPasswordRequest: Encodable {
+    let email: String
+    let code: String
+    let newPassword: String
+
+    enum CodingKeys: String, CodingKey {
+        case email, code
+        case newPassword = "new_password"
+    }
+}
+
+struct MessageResponse: Decodable {
+    let message: String
+    let developmentCode: String?
+
+    enum CodingKeys: String, CodingKey {
+        case message
+        case developmentCode = "development_code"
+    }
+}
+
 struct GoogleAuthRequest: Encodable {
     let idToken: String
 

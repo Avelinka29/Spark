@@ -128,6 +128,12 @@ actor APIClient {
             return "Аккаунт уже существует. Перейдите во вкладку «Вход»."
         case "Google Sign-In is not configured":
             return "Вход через Google временно недоступен."
+        case "Email is not verified":
+            return "Подтвердите email с помощью кода из письма."
+        case "Invalid or expired verification code":
+            return "Код неверный или срок его действия истёк."
+        case "Email delivery is not configured":
+            return "Отправка писем временно недоступна."
         default:
             return message
         }

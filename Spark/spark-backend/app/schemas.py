@@ -11,6 +11,23 @@ class RegisterRequest(BaseModel):
     name: str = Field(min_length=2, max_length=120)
 
 
+class EmailRequest(BaseModel):
+    email: EmailStr
+
+
+class VerifyCodeRequest(EmailRequest):
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class ResetPasswordRequest(VerifyCodeRequest):
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class MessageResponse(BaseModel):
+    message: str
+    development_code: str | None = None
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
