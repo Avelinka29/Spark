@@ -42,7 +42,8 @@ final class ProfileStore {
                 $0.makeAchievement()
             }
             profile = loadedProfile
-            avatarImage = loadAvatar(userID: loadedProfile.id)
+            avatarImage = await loadRemoteAvatar(token: token)
+                ?? loadAvatar(userID: loadedProfile.id)
         } catch {
             profile = nil
             errorMessage = error.localizedDescription
@@ -87,20 +88,48 @@ final class ProfileStore {
     }
 
     func updateAvatar(with data: Data) {
-        guard let userID = profile?.id,
+        guard let token,
+              let userID = profile?.id,
               let image = UIImage(data: data),
               let jpegData = image.jpegData(compressionQuality: 0.82) else {
             errorMessage = "Не удалось загрузить выбранное изображение."
             return
         }
 
+        avatarImage = UIImage(data: jpegData)
+        Task {
+            do {
+                let _: EmptyResponse = try await APIClient.shared.send(
+                    path: "profile/avatar",
+                    method: "PUT",
+                    body: AvatarDTO(
+                        data: jpegData.base64EncodedString(),
+                        contentType: "image/jpeg"
+                    ),
+                    token: token
+                )
+                let url = try avatarURL(userID: userID)
+                try jpegData.write(to: url, options: .atomic)
+                errorMessage = nil
+            } catch {
+                avatarImage = loadAvatar(userID: userID)
+                errorMessage = "Не удалось сохранить фотографию профиля на сервере."
+            }
+        }
+    }
+
+    private func loadRemoteAvatar(token: String) async -> UIImage? {
         do {
-            let url = try avatarURL(userID: userID)
-            try jpegData.write(to: url, options: .atomic)
-            avatarImage = UIImage(data: jpegData)
-            errorMessage = nil
+            let response: AvatarDTO = try await APIClient.shared.send(
+                path: "profile/avatar",
+                token: token
+            )
+            guard let data = Data(base64Encoded: response.data) else {
+                return nil
+            }
+            return UIImage(data: data)
         } catch {
-            errorMessage = "Не удалось сохранить фотографию профиля."
+            return nil
         }
     }
 

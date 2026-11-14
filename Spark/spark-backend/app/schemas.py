@@ -1,4 +1,6 @@
 import uuid
+import base64
+import binascii
 from datetime import date
 from typing import Literal
 
@@ -26,6 +28,17 @@ class ResetPasswordRequest(VerifyCodeRequest):
 class MessageResponse(BaseModel):
     message: str
     development_code: str | None = None
+
+
+class AvatarRequest(BaseModel):
+    data: str = Field(min_length=4)
+    content_type: Literal["image/jpeg", "image/png"]
+
+    def decoded_data(self) -> bytes:
+        try:
+            return base64.b64decode(self.data, validate=True)
+        except (ValueError, binascii.Error) as error:
+            raise ValueError("Invalid avatar data") from error
 
 
 class LoginRequest(BaseModel):

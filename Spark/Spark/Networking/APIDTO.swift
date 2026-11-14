@@ -42,6 +42,16 @@ struct MessageResponse: Decodable {
     }
 }
 
+struct AvatarDTO: Codable {
+    let data: String
+    let contentType: String
+
+    enum CodingKeys: String, CodingKey {
+        case data
+        case contentType = "content_type"
+    }
+}
+
 struct GoogleAuthRequest: Encodable {
     let idToken: String
 

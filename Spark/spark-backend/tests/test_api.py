@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import os
 import uuid
 
@@ -72,6 +73,17 @@ def test_full_user_scenario() -> None:
             profile = client.get("/api/v1/profile/me", headers=headers)
             assert profile.status_code == 200
             assert profile.json()["email"] == email
+
+            avatar_data = base64.b64encode(b"spark-avatar-test").decode()
+            avatar_update = client.put(
+                "/api/v1/profile/avatar",
+                headers=headers,
+                json={"data": avatar_data, "content_type": "image/jpeg"},
+            )
+            assert avatar_update.status_code == 204
+            avatar = client.get("/api/v1/profile/avatar", headers=headers)
+            assert avatar.status_code == 200
+            assert avatar.json()["data"] == avatar_data
 
             achievement = client.post(
                 "/api/v1/achievements",

@@ -1,4 +1,5 @@
 import hashlib
+import base64
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -22,6 +23,7 @@ from .schemas import (
     ApplicationStatusUpdate,
     AchievementCreate,
     AchievementResponse,
+    AvatarRequest,
     EmailRequest,
     GoogleAuthRequest,
     MessageResponse,
@@ -505,6 +507,45 @@ async def cancel_application(
 @app.get("/api/v1/profile/me", response_model=ProfileResponse)
 async def my_profile(user: User = Depends(current_user)) -> User:
     return user
+
+
+@app.get("/api/v1/profile/avatar", response_model=AvatarRequest)
+async def profile_avatar(user: User = Depends(current_user)) -> AvatarRequest:
+    if user.avatar_data is None:
+        raise HTTPException(status_code=404, detail="Avatar not found")
+    return AvatarRequest(
+        data=base64.b64encode(user.avatar_data).decode(),
+        content_type=user.avatar_content_type or "image/jpeg",
+    )
+
+
+@app.put("/api/v1/profile/avatar", status_code=status.HTTP_204_NO_CONTENT)
+async def update_profile_avatar(
+    payload: AvatarRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    try:
+        image_data = payload.decoded_data()
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="Invalid avatar data") from error
+    if len(image_data) > 2_000_000:
+        raise HTTPException(status_code=413, detail="Avatar is too large")
+    if not image_data:
+        raise HTTPException(status_code=422, detail="Invalid avatar data")
+    user.avatar_data = image_data
+    user.avatar_content_type = payload.content_type
+    await session.commit()
+
+
+@app.delete("/api/v1/profile/avatar", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_profile_avatar(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    user.avatar_data = None
+    user.avatar_content_type = None
+    await session.commit()
 
 
 @app.get("/api/v1/achievements", response_model=list[AchievementResponse])
