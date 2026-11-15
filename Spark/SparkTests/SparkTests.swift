@@ -80,3 +80,57 @@ struct APIDTOTests {
         #expect(opportunity.coordinate != nil)
     }
 }
+
+struct KeychainStoreTests {
+    @Test
+    func `Token can be saved read and deleted`() throws {
+        let store = KeychainStore(
+            service: "SparkTests.\(UUID().uuidString)",
+            account: "test-token"
+        )
+        defer { store.deleteToken() }
+
+        try store.saveToken("test-access-token")
+        #expect(store.readToken() == "test-access-token")
+
+        store.deleteToken()
+        #expect(store.readToken() == nil)
+    }
+}
+
+struct AuthValidationTests {
+    @Test @MainActor
+    func `Login requires email and password`() async {
+        let store = makeAuthStore()
+
+        let succeeded = await store.login(email: "", password: "")
+
+        #expect(!succeeded)
+        #expect(store.errorMessage == "Введите email и пароль.")
+    }
+
+    @Test @MainActor
+    func `Registration rejects a short password before network request`() async {
+        let store = makeAuthStore()
+
+        let succeeded = await store.register(
+            name: "Авелина",
+            email: "avelina@example.com",
+            password: "short"
+        )
+
+        #expect(!succeeded)
+        #expect(store.errorMessage == "Пароль должен содержать не менее 8 символов.")
+    }
+
+    @MainActor
+    private func makeAuthStore() -> AuthStore {
+        let suiteName = "SparkTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        defaults.removePersistentDomain(forName: suiteName)
+        return AuthStore(
+            keychain: KeychainStore(service: suiteName, account: "test-token"),
+            defaults: defaults
+        )
+    }
+}

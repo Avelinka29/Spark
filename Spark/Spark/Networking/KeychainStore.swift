@@ -2,8 +2,16 @@ import Foundation
 import Security
 
 struct KeychainStore {
-    private let service = "Avelina-Maksimchik.Spark"
-    private let account = "access-token"
+    private let service: String
+    private let account: String
+
+    init(
+        service: String = "Avelina-Maksimchik.Spark",
+        account: String = "access-token"
+    ) {
+        self.service = service
+        self.account = account
+    }
 
     func saveToken(_ token: String) throws {
         let data = Data(token.utf8)
