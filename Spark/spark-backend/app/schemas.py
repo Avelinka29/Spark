@@ -86,6 +86,12 @@ class RoleResponse(RoleCreate):
     is_open: bool
 
 
+class RoleUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=120)
+    skills: str | None = None
+    is_open: bool | None = None
+
+
 class ProjectCreate(BaseModel):
     category: str = Field(min_length=2, max_length=80)
     title: str = Field(min_length=2, max_length=200)

@@ -35,6 +35,9 @@ from .schemas import (
     ProjectUpdate,
     RegisterRequest,
     ResetPasswordRequest,
+    RoleCreate,
+    RoleResponse,
+    RoleUpdate,
     TokenResponse,
     VerifyCodeRequest,
 )
@@ -380,6 +383,71 @@ async def delete_project(
     if project.owner_id != user.id:
         raise HTTPException(status_code=403, detail="Only the project owner can delete it")
     await session.delete(project)
+    await session.commit()
+
+
+async def owned_project_for_role(
+    role_id: uuid.UUID,
+    user: User,
+    session: AsyncSession,
+) -> tuple[ProjectRole, Project]:
+    role = await session.get(ProjectRole, role_id)
+    if role is None:
+        raise HTTPException(status_code=404, detail="Project role not found")
+    project = await session.get(Project, role.project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the project owner can manage roles")
+    return role, project
+
+
+@app.post(
+    "/api/v1/projects/{project_id}/roles",
+    response_model=RoleResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_project_role(
+    project_id: uuid.UUID,
+    payload: RoleCreate,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ProjectRole:
+    project = await session.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Only the project owner can manage roles")
+    role = ProjectRole(project_id=project.id, title=payload.title, skills=payload.skills)
+    session.add(role)
+    await session.commit()
+    await session.refresh(role)
+    return role
+
+
+@app.patch("/api/v1/project-roles/{role_id}", response_model=RoleResponse)
+async def update_project_role(
+    role_id: uuid.UUID,
+    payload: RoleUpdate,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ProjectRole:
+    role, _ = await owned_project_for_role(role_id, user, session)
+    for field, value in payload.model_dump(exclude_none=True).items():
+        setattr(role, field, value)
+    await session.commit()
+    await session.refresh(role)
+    return role
+
+
+@app.delete("/api/v1/project-roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_project_role(
+    role_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    role, _ = await owned_project_for_role(role_id, user, session)
+    await session.delete(role)
     await session.commit()
 
 

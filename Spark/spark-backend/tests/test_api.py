@@ -196,6 +196,27 @@ def test_full_user_scenario() -> None:
             assert updated_project.status_code == 200
             assert updated_project.json()["title"] == "Updated Integration Project"
 
+            added_role = client.post(
+                f"/api/v1/projects/{project['id']}/roles",
+                headers=headers,
+                json={"title": "QA Engineer", "skills": "Testing"},
+            )
+            assert added_role.status_code == 201
+
+            updated_role = client.patch(
+                f"/api/v1/project-roles/{added_role.json()['id']}",
+                headers=headers,
+                json={"skills": "Swift Testing"},
+            )
+            assert updated_role.status_code == 200
+            assert updated_role.json()["skills"] == "Swift Testing"
+
+            deleted_role = client.delete(
+                f"/api/v1/project-roles/{added_role.json()['id']}",
+                headers=headers,
+            )
+            assert deleted_role.status_code == 204
+
             deleted_project = client.delete(
                 f"/api/v1/projects/{project['id']}",
                 headers=headers,

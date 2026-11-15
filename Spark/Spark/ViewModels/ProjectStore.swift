@@ -166,6 +166,66 @@ final class ProjectStore {
             return false
         }
     }
+
+    func updateProject(
+        id: UUID,
+        category: String,
+        title: String,
+        summary: String,
+        ownerRole: String
+    ) async -> Bool {
+        guard let token else { return false }
+        do {
+            let _: ProjectDTO = try await APIClient.shared.send(
+                path: "projects/\(id)",
+                method: "PATCH",
+                body: ProjectUpdateRequest(
+                    category: category,
+                    title: title,
+                    summary: summary,
+                    ownerRole: ownerRole
+                ),
+                token: token
+            )
+            await load()
+            successFeedbackTrigger += 1
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func addRole(projectID: UUID, title: String, skills: String) async -> Bool {
+        guard let token else { return false }
+        do {
+            let _: ProjectRoleDTO = try await APIClient.shared.send(
+                path: "projects/\(projectID)/roles",
+                method: "POST",
+                body: ProjectRoleCreateRequest(title: title, skills: skills),
+                token: token
+            )
+            await load()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func deleteRole(id: UUID) async {
+        guard let token else { return }
+        do {
+            let _: EmptyResponse = try await APIClient.shared.send(
+                path: "project-roles/\(id)",
+                method: "DELETE",
+                token: token
+            )
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 }
 
 private struct ApplicationResponse: Decodable {

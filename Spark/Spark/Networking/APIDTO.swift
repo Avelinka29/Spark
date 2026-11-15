@@ -168,6 +168,23 @@ struct ProjectDTO: Codable {
     }
 }
 
+struct ProjectUpdateRequest: Encodable {
+    let category: String
+    let title: String
+    let summary: String
+    let ownerRole: String
+
+    enum CodingKeys: String, CodingKey {
+        case category, title, summary
+        case ownerRole = "owner_role"
+    }
+}
+
+struct ProjectRoleCreateRequest: Encodable {
+    let title: String
+    let skills: String
+}
+
 struct ProjectApplicationDTO: Identifiable, Decodable {
     let id: UUID
     let userID: UUID

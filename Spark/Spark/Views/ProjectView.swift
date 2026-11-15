@@ -115,13 +115,18 @@ private struct ProjectDetailsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
+    @State private var showEditor = false
+
+    private var currentProject: Project {
+        store.projects.first { $0.id == project.id } ?? project
+    }
 
     var body: some View {
         List {
             Section("О проекте") {
-                Text(project.summary)
-                Label(project.ownerRole, systemImage: "person.crop.circle")
-                Label("\(project.memberCount) участников", systemImage: "person.2")
+                Text(currentProject.summary)
+                Label(currentProject.ownerRole, systemImage: "person.crop.circle")
+                Label("\(currentProject.memberCount) участников", systemImage: "person.2")
             }
 
             Section("Роли") {
@@ -130,7 +135,7 @@ private struct ProjectDetailsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                ForEach(project.vacancies) { vacancy in
+                ForEach(currentProject.vacancies) { vacancy in
                     VStack(alignment: .leading, spacing: 8) {
                         Text(vacancy.title)
                             .font(.headline)
@@ -158,8 +163,18 @@ private struct ProjectDetailsView: View {
                 }
             }
         }
-        .navigationTitle(project.title)
+        .navigationTitle(currentProject.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if isOwner {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Изменить") { showEditor = true }
+                }
+            }
+        }
+        .sheet(isPresented: $showEditor) {
+            ProjectEditorView(project: currentProject, store: store)
+        }
         .confirmationDialog(
             "Удалить проект без возможности восстановления?",
             isPresented: $showDeleteConfirmation,
@@ -170,6 +185,116 @@ private struct ProjectDetailsView: View {
                     if await store.deleteProject(id: project.id) {
                         dismiss()
                     }
+                }
+            }
+        }
+    }
+}
+
+private struct ProjectEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let project: Project
+    let store: ProjectStore
+
+    @State private var category: String
+    @State private var title: String
+    @State private var summary: String
+    @State private var ownerRole: String
+    @State private var newRoleTitle = ""
+    @State private var newRoleSkills = ""
+    @State private var isSaving = false
+
+    private var currentVacancies: [Vacancy] {
+        store.projects.first { $0.id == project.id }?.vacancies ?? project.vacancies
+    }
+
+    init(project: Project, store: ProjectStore) {
+        self.project = project
+        self.store = store
+        _category = State(initialValue: project.category)
+        _title = State(initialValue: project.title)
+        _summary = State(initialValue: project.summary)
+        _ownerRole = State(initialValue: project.ownerRole)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Проект") {
+                    TextField("Категория", text: $category)
+                    TextField("Название", text: $title)
+                    TextField("Описание", text: $summary, axis: .vertical)
+                        .lineLimit(3...8)
+                    TextField("Моя роль", text: $ownerRole)
+                }
+
+                Section("Открытые роли") {
+                    ForEach(currentVacancies) { vacancy in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(vacancy.title)
+                                Text(vacancy.roleDescription)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button(role: .destructive) {
+                                Task { await store.deleteRole(id: vacancy.id) }
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                        }
+                    }
+                }
+
+                Section("Добавить роль") {
+                    TextField("Название роли", text: $newRoleTitle)
+                    TextField("Навыки", text: $newRoleSkills)
+                    Button("Добавить") {
+                        Task {
+                            if await store.addRole(
+                                projectID: project.id,
+                                title: newRoleTitle,
+                                skills: newRoleSkills
+                            ) {
+                                newRoleTitle = ""
+                                newRoleSkills = ""
+                            }
+                        }
+                    }
+                    .disabled(newRoleTitle.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                }
+            }
+            .navigationTitle("Редактирование")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Сохранить") {
+                        Task {
+                            isSaving = true
+                            if await store.updateProject(
+                                id: project.id,
+                                category: category,
+                                title: title,
+                                summary: summary,
+                                ownerRole: ownerRole
+                            ) {
+                                dismiss()
+                            }
+                            isSaving = false
+                        }
+                    }
+                    .disabled(
+                        isSaving ||
+                        category.count < 2 ||
+                        title.count < 2 ||
+                        summary.count < 10 ||
+                        ownerRole.count < 2
+                    )
                 }
             }
         }
