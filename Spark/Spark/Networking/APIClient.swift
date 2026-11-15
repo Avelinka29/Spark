@@ -11,7 +11,7 @@ enum APIError: LocalizedError {
         case .invalidResponse:
             return "Сервер вернул некорректный ответ."
         case .networkUnavailable:
-            return "Не удалось подключиться к Spark Backend. Проверьте, что Mac и iPhone находятся в одной Wi-Fi сети, а сервер запущен."
+            return "Не удалось подключиться к Spark Backend. Проверьте интернет-соединение и доступность сервера."
         case let .server(_, message):
             return message
         case .notAuthenticated:
@@ -157,6 +157,12 @@ private enum APIConfiguration {
     static let baseURL: URL = {
         if let override = ProcessInfo.processInfo.environment["SPARK_API_BASE_URL"],
            let url = URL(string: normalized(override)) {
+            return url
+        }
+
+        if let configuredURL = Bundle.main.object(forInfoDictionaryKey: "SparkAPIBaseURL") as? String,
+           !configuredURL.isEmpty,
+           let url = URL(string: normalized(configuredURL)) {
             return url
         }
 

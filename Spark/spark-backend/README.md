@@ -42,7 +42,7 @@ For deployed environments, add Alembic migrations before changing the schema.
    curl https://api.example.com/health
    ```
 
-8. Set the iOS `SPARK_API_BASE_URL` release value to `https://api.example.com/api/v1/`.
+8. Add the iOS Info.plist string key `SparkAPIBaseURL` with `https://api.example.com/api/v1/`. The `SPARK_API_BASE_URL` process environment remains available for temporary local overrides, but should not be relied on by an archived TestFlight build.
 9. Back up the `spark_production_postgres` Docker volume and test restoration before launch.
 
 Never commit `.env`, SMTP passwords, OAuth client secrets, database passwords or JWT secrets. Rotate any credential that has been pasted into chat or published elsewhere.
