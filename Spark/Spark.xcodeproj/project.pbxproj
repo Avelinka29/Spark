@@ -12,6 +12,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		8F20D7BA30A9C1A600A0ED9A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0464F7C82FDEDE2900DA9AE9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0464F7CF2FDEDE2900DA9AE9;
+			remoteInfo = Spark;
+		};
 		8F565E96308A2C8300BEED67 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 0464F7C82FDEDE2900DA9AE9 /* Project object */;
@@ -23,6 +30,7 @@
 
 /* Begin PBXFileReference section */
 		0464F7D02FDEDE2900DA9AE9 /* Spark.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Spark.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8F20D7B630A9C1A600A0ED9A /* SparkUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SparkUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8FD0D58930891405004A56D2 /* SparkTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SparkTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -45,6 +53,11 @@
 			path = Spark;
 			sourceTree = "<group>";
 		};
+		8F20D7B730A9C1A600A0ED9A /* SparkUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SparkUITests;
+			sourceTree = "<group>";
+		};
 		8FD0D58A30891405004A56D2 /* SparkTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = SparkTests;
@@ -59,6 +72,13 @@
 			files = (
 				8F2CB00E30961F52002F1B63 /* GoogleSignIn in Frameworks */,
 				8F2CB01030961F52002F1B63 /* GoogleSignInSwift in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8F20D7B330A9C1A600A0ED9A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -77,6 +97,7 @@
 			children = (
 				263123F22FE97513001ABB0C /* Spark */,
 				8FD0D58A30891405004A56D2 /* SparkTests */,
+				8F20D7B730A9C1A600A0ED9A /* SparkUITests */,
 				8F2CB00C30961F52002F1B63 /* Frameworks */,
 				0464F7D12FDEDE2900DA9AE9 /* Products */,
 			);
@@ -87,6 +108,7 @@
 			children = (
 				0464F7D02FDEDE2900DA9AE9 /* Spark.app */,
 				8FD0D58930891405004A56D2 /* SparkTests.xctest */,
+				8F20D7B630A9C1A600A0ED9A /* SparkUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -125,6 +147,29 @@
 			productReference = 0464F7D02FDEDE2900DA9AE9 /* Spark.app */;
 			productType = "com.apple.product-type.application";
 		};
+		8F20D7B530A9C1A600A0ED9A /* SparkUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8F20D7BE30A9C1A600A0ED9A /* Build configuration list for PBXNativeTarget "SparkUITests" */;
+			buildPhases = (
+				8F20D7B230A9C1A600A0ED9A /* Sources */,
+				8F20D7B330A9C1A600A0ED9A /* Frameworks */,
+				8F20D7B430A9C1A600A0ED9A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8F20D7BB30A9C1A600A0ED9A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				8F20D7B730A9C1A600A0ED9A /* SparkUITests */,
+			);
+			name = SparkUITests;
+			packageProductDependencies = (
+			);
+			productName = SparkUITests;
+			productReference = 8F20D7B630A9C1A600A0ED9A /* SparkUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		8FD0D58830891405004A56D2 /* SparkTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 8FD0D58D30891405004A56D2 /* Build configuration list for PBXNativeTarget "SparkTests" */;
@@ -155,11 +200,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2700;
+				LastSwiftUpdateCheck = 2720;
 				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					0464F7CF2FDEDE2900DA9AE9 = {
 						CreatedOnToolsVersion = 16.2;
+					};
+					8F20D7B530A9C1A600A0ED9A = {
+						CreatedOnToolsVersion = 27.2;
+						TestTargetID = 0464F7CF2FDEDE2900DA9AE9;
 					};
 					8FD0D58830891405004A56D2 = {
 						CreatedOnToolsVersion = 27.0;
@@ -185,12 +234,20 @@
 			targets = (
 				0464F7CF2FDEDE2900DA9AE9 /* Spark */,
 				8FD0D58830891405004A56D2 /* SparkTests */,
+				8F20D7B530A9C1A600A0ED9A /* SparkUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		0464F7CE2FDEDE2900DA9AE9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8F20D7B430A9C1A600A0ED9A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -214,6 +271,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8F20D7B230A9C1A600A0ED9A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8FD0D58530891405004A56D2 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -224,6 +288,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		8F20D7BB30A9C1A600A0ED9A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0464F7CF2FDEDE2900DA9AE9 /* Spark */;
+			targetProxy = 8F20D7BA30A9C1A600A0ED9A /* PBXContainerItemProxy */;
+		};
 		8F565E97308A2C8300BEED67 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 0464F7CF2FDEDE2900DA9AE9 /* Spark */;
@@ -421,6 +490,54 @@
 			};
 			name = Release;
 		};
+		8F20D7BC30A9C1A600A0ED9A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.2;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Avelina-Maksimchik.SparkUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = Spark;
+				XROS_DEPLOYMENT_TARGET = 27.2;
+			};
+			name = Debug;
+		};
+		8F20D7BD30A9C1A600A0ED9A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.2;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Avelina-Maksimchik.SparkUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = Spark;
+				XROS_DEPLOYMENT_TARGET = 27.2;
+			};
+			name = Release;
+		};
 		8FD0D58E30891405004A56D2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -488,6 +605,15 @@
 			buildConfigurations = (
 				0464F7DF2FDEDE2B00DA9AE9 /* Debug */,
 				0464F7E02FDEDE2B00DA9AE9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8F20D7BE30A9C1A600A0ED9A /* Build configuration list for PBXNativeTarget "SparkUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8F20D7BC30A9C1A600A0ED9A /* Debug */,
+				8F20D7BD30A9C1A600A0ED9A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
