@@ -165,6 +165,15 @@ private struct ProfileSettingsView: View {
                     }
                 }
 
+                NavigationLink {
+                    PrivacyPolicyView()
+                } label: {
+                    Label("Политика конфиденциальности", systemImage: "hand.raised")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.bordered)
+                .padding(.horizontal, 24)
+
                 Spacer()
 
                 Button(action: onLogout) {
@@ -213,6 +222,58 @@ private struct ProfileSettingsView: View {
             }
             Button("Отмена", role: .cancel) {}
         }
+    }
+}
+
+private struct PrivacyPolicyView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                PrivacySection(
+                    title: "Какие данные хранит Spark",
+                    text: "Данные аккаунта и профиля, аватар, достижения, закладки, проекты, отклики и внутренние уведомления. При входе через Google Spark получает идентификатор, имя и подтверждённый email аккаунта."
+                )
+                PrivacySection(
+                    title: "Для чего используются данные",
+                    text: "Чтобы обеспечивать авторизацию, показывать профиль, сохранять выбранные возможности и поддерживать совместную работу над проектами. Spark не продаёт персональные данные."
+                )
+                PrivacySection(
+                    title: "Хранение и защита",
+                    text: "Данные профиля хранятся в базе Spark Backend. Токен сессии хранится в Keychain устройства. Пароли сохраняются только в виде защищённого хеша."
+                )
+                PrivacySection(
+                    title: "Удаление данных",
+                    text: "Аккаунт и связанные с ним данные можно удалить в настройках профиля. Это действие необратимо."
+                )
+                PrivacySection(
+                    title: "Сторонние сервисы",
+                    text: "Google Sign-In используется только по выбору пользователя и обрабатывается в соответствии с политикой конфиденциальности Google."
+                )
+
+                Text("Редакция от 15 ноября 2026 года")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(24)
+        }
+        .navigationTitle("Конфиденциальность")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct PrivacySection: View {
+    let title: String
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            Text(text)
+                .font(.body)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
