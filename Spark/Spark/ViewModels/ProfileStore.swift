@@ -87,6 +87,27 @@ final class ProfileStore {
         }
     }
 
+    func deleteAccount() async -> Bool {
+        guard let token else { return false }
+        let userID = profile?.id
+        do {
+            let _: EmptyResponse = try await APIClient.shared.send(
+                path: "profile/me",
+                method: "DELETE",
+                token: token
+            )
+            profile = nil
+            avatarImage = nil
+            if let userID, let url = try? avatarURL(userID: userID) {
+                try? FileManager.default.removeItem(at: url)
+            }
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func updateAvatar(with data: Data) {
         guard let token,
               let userID = profile?.id,

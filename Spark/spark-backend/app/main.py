@@ -595,6 +595,15 @@ async def my_profile(user: User = Depends(current_user)) -> User:
     return user
 
 
+@app.delete("/api/v1/profile/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    await session.delete(user)
+    await session.commit()
+
+
 @app.get("/api/v1/notifications", response_model=list[NotificationResponse])
 async def list_notifications(
     user: User = Depends(current_user),

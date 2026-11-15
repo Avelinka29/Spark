@@ -222,6 +222,15 @@ def test_full_user_scenario() -> None:
                 headers=headers,
             )
             assert deleted_project.status_code == 204
+
+            deleted_account = client.delete("/api/v1/profile/me", headers=headers)
+            assert deleted_account.status_code == 204
+
+            login_after_deletion = client.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": "spark-updated-password"},
+            )
+            assert login_after_deletion.status_code == 401
     finally:
         asyncio.run(delete_test_user(email))
 

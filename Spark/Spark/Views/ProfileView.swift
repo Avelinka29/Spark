@@ -18,6 +18,7 @@ struct ProfileView: View {
                         onAvatarSelected: store.updateAvatar,
                         onAddAchievement: store.addAchievement,
                         onDeleteAchievement: store.deleteAchievement,
+                        onDeleteAccount: store.deleteAccount,
                         isBiometricEnabled: isBiometricEnabled,
                         canUseBiometrics: canUseBiometrics,
                         onBiometricChange: onBiometricChange,
@@ -58,6 +59,7 @@ private struct ProfileContent: View {
     let onAvatarSelected: (Data) -> Void
     let onAddAchievement: (String, String, Date) async -> Bool
     let onDeleteAchievement: (UUID) async -> Void
+    let onDeleteAccount: () async -> Bool
     let isBiometricEnabled: Bool
     let canUseBiometrics: Bool
     let onBiometricChange: (Bool) async -> Bool
@@ -97,15 +99,16 @@ private struct ProfileContent: View {
             ProfileSettingsView(
                 isBiometricEnabled: isBiometricEnabled,
                 canUseBiometrics: canUseBiometrics,
-                onBiometricChange: onBiometricChange
+                onBiometricChange: onBiometricChange,
+                onDeleteAccount: onDeleteAccount
             ) {
-                    showSettings = false
+                showSettings = false
 
-                    Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(350))
-                        onLogout()
-                    }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    onLogout()
                 }
+            }
         }
         .sheet(isPresented: $showAchievementForm) {
             AchievementForm { title, issuer, date in
@@ -125,18 +128,22 @@ private struct ProfileSettingsView: View {
     let onLogout: () -> Void
     let canUseBiometrics: Bool
     let onBiometricChange: (Bool) async -> Bool
+    let onDeleteAccount: () async -> Bool
 
     @State private var isBiometricEnabled: Bool
+    @State private var showDeleteConfirmation = false
 
     init(
         isBiometricEnabled: Bool,
         canUseBiometrics: Bool,
         onBiometricChange: @escaping (Bool) async -> Bool,
+        onDeleteAccount: @escaping () async -> Bool,
         onLogout: @escaping () -> Void
     ) {
         _isBiometricEnabled = State(initialValue: isBiometricEnabled)
         self.canUseBiometrics = canUseBiometrics
         self.onBiometricChange = onBiometricChange
+        self.onDeleteAccount = onDeleteAccount
         self.onLogout = onLogout
     }
 
@@ -170,6 +177,15 @@ private struct ProfileSettingsView: View {
                 .tint(.red)
                 .padding(.horizontal, 24)
 
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Label("Удалить аккаунт", systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .padding(.horizontal, 24)
+
                 Spacer()
             }
             .navigationTitle("Настройки")
@@ -183,6 +199,20 @@ private struct ProfileSettingsView: View {
             }
         }
         .presentationDetents([.medium])
+        .confirmationDialog(
+            "Аккаунт и все связанные данные будут удалены без возможности восстановления.",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Удалить аккаунт", role: .destructive) {
+                Task {
+                    if await onDeleteAccount() {
+                        onLogout()
+                    }
+                }
+            }
+            Button("Отмена", role: .cancel) {}
+        }
     }
 }
 
