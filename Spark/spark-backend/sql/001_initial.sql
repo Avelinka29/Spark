@@ -93,3 +93,15 @@ CREATE TABLE achievements (
     issuer VARCHAR(160) NOT NULL,
     issued_at DATE NOT NULL
 );
+
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(160) NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX ix_notifications_user_id ON notifications(user_id);
+CREATE INDEX ix_notifications_is_read ON notifications(is_read);

@@ -1,7 +1,7 @@
 import uuid
 import base64
 import binascii
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -146,3 +146,13 @@ class AchievementResponse(AchievementCreate):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+
+
+class NotificationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    message: str
+    is_read: bool
+    created_at: datetime

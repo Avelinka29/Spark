@@ -5,7 +5,9 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var projectStore: ProjectStore
     @State private var profileStore: ProfileStore
+    @State private var notificationStore: NotificationStore
     @State private var showAuthenticationRequired = false
+    @State private var showNotifications = false
 
     private let accessToken: String?
     private let isBiometricEnabled: Bool
@@ -27,6 +29,7 @@ struct MainTabView: View {
         self.onLogout = onLogout
         _projectStore = State(initialValue: ProjectStore(token: accessToken))
         _profileStore = State(initialValue: ProfileStore(token: accessToken))
+        _notificationStore = State(initialValue: NotificationStore(token: accessToken))
     }
 
     var body: some View {
@@ -36,6 +39,14 @@ struct MainTabView: View {
                     accessToken: accessToken,
                     avatarImage: profileStore.avatarImage,
                     profileName: profileStore.profile?.name,
+                    unreadNotificationCount: notificationStore.unreadCount,
+                    onNotificationsTap: {
+                        if accessToken == nil {
+                            showAuthenticationRequired = true
+                        } else {
+                            showNotifications = true
+                        }
+                    },
                     onAvatarTap: {
                         if accessToken == nil {
                             onLogout()
@@ -105,10 +116,15 @@ struct MainTabView: View {
         }
         .navigationBarBackButtonHidden(true)
         .task {
-            await profileStore.load()
+            async let profileLoad: Void = profileStore.load()
+            async let notificationLoad: Void = notificationStore.load()
+            _ = await (profileLoad, notificationLoad)
         }
         .sheet(isPresented: $showCreateProject) {
             CreateProjectView(store: projectStore)
+        }
+        .sheet(isPresented: $showNotifications) {
+            NotificationCenterView(store: notificationStore)
         }
         .alert("Нужна авторизация", isPresented: $showAuthenticationRequired) {
             Button("Понятно", role: .cancel) {}

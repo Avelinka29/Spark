@@ -166,6 +166,16 @@ def test_full_user_scenario() -> None:
             assert accepted.status_code == 200
             assert accepted.json()["status"] == "accepted"
 
+            notifications = client.get("/api/v1/notifications", headers=headers)
+            assert notifications.status_code == 200
+            assert notifications.json()
+            notification_id = notifications.json()[0]["id"]
+            marked_read = client.patch(
+                f"/api/v1/notifications/{notification_id}/read",
+                headers=headers,
+            )
+            assert marked_read.status_code == 204
+
             second_role_id = project["roles"][1]["id"]
             second_application = client.post(
                 f"/api/v1/project-roles/{second_role_id}/applications",

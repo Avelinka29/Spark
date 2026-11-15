@@ -16,7 +16,7 @@ from starlette.concurrency import run_in_threadpool
 from .config import get_settings
 from .database import get_session
 from .email_service import send_auth_code
-from .models import Achievement, Application, ApplicationStatus, AuthCode, AuthCodePurpose, Bookmark, Opportunity, Project, ProjectRole, User
+from .models import Achievement, Application, ApplicationStatus, AuthCode, AuthCodePurpose, Bookmark, Notification, Opportunity, Project, ProjectRole, User
 from .schemas import (
     LoginRequest,
     ApplicationResponse,
@@ -27,6 +27,7 @@ from .schemas import (
     EmailRequest,
     GoogleAuthRequest,
     MessageResponse,
+    NotificationResponse,
     OpportunityResponse,
     ProfileResponse,
     ProjectCreate,
@@ -396,6 +397,15 @@ async def apply_to_role(
         raise HTTPException(status_code=409, detail="Application already exists")
     application = Application(user_id=user.id, project_role_id=role_id)
     session.add(application)
+    project = await session.get(Project, role.project_id)
+    if project is not None and project.owner_id != user.id:
+        session.add(
+            Notification(
+                user_id=project.owner_id,
+                title="Новый отклик",
+                message=f"{user.name} откликнулся на роль «{role.title}» в проекте «{project.title}».",
+            )
+        )
     await session.commit()
     await session.refresh(application)
     return {"id": application.id}
@@ -473,6 +483,14 @@ async def decide_application(
         raise HTTPException(status_code=403, detail="Only the project owner can decide applications")
 
     application.status = ApplicationStatus(payload.status)
+    decision_text = "принята" if payload.status == "accepted" else "отклонена"
+    session.add(
+        Notification(
+            user_id=application.user_id,
+            title="Решение по заявке",
+            message=f"Ваша заявка на роль «{role.title}» в проекте «{project.title}» {decision_text}.",
+        )
+    )
     if payload.status == "accepted":
         role.is_open = False
         await session.execute(
@@ -507,6 +525,33 @@ async def cancel_application(
 @app.get("/api/v1/profile/me", response_model=ProfileResponse)
 async def my_profile(user: User = Depends(current_user)) -> User:
     return user
+
+
+@app.get("/api/v1/notifications", response_model=list[NotificationResponse])
+async def list_notifications(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[Notification]:
+    query = (
+        select(Notification)
+        .where(Notification.user_id == user.id)
+        .order_by(Notification.created_at.desc())
+        .limit(100)
+    )
+    return list((await session.scalars(query)).all())
+
+
+@app.patch("/api/v1/notifications/{notification_id}/read", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_notification_read(
+    notification_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    notification = await session.get(Notification, notification_id)
+    if notification is None or notification.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    notification.is_read = True
+    await session.commit()
 
 
 @app.get("/api/v1/profile/avatar", response_model=AvatarRequest)

@@ -4,6 +4,8 @@ struct HomeView: View {
     let accessToken: String?
     let avatarImage: UIImage?
     let profileName: String?
+    let unreadNotificationCount: Int
+    let onNotificationsTap: () -> Void
     let onAvatarTap: () -> Void
 
     @State private var model = OpportunitiesViewModel()
@@ -17,6 +19,8 @@ struct HomeView: View {
                     isAuthenticated: accessToken != nil,
                     avatarImage: avatarImage,
                     profileName: profileName,
+                    unreadNotificationCount: unreadNotificationCount,
+                    onNotificationsTap: onNotificationsTap,
                     onTap: onAvatarTap
                 )
 
@@ -87,6 +91,8 @@ private struct HomeHeader: View {
     let isAuthenticated: Bool
     let avatarImage: UIImage?
     let profileName: String?
+    let unreadNotificationCount: Int
+    let onNotificationsTap: () -> Void
     let onTap: () -> Void
 
     var body: some View {
@@ -96,6 +102,24 @@ private struct HomeHeader: View {
                 .font(.system(size: 24, weight: .semibold))
 
             Spacer()
+
+            Button(action: onNotificationsTap) {
+                Image(systemName: unreadNotificationCount > 0 ? "bell.fill" : "bell")
+                    .font(.title2)
+                    .foregroundStyle(.primaryLitePurple)
+                    .overlay(alignment: .topTrailing) {
+                        if unreadNotificationCount > 0 {
+                            Text("\(min(unreadNotificationCount, 99))")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.white)
+                                .padding(4)
+                                .background(.red, in: Circle())
+                                .offset(x: 10, y: -10)
+                        }
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Уведомления")
 
             Button(action: onTap) {
                 ZStack {
@@ -177,6 +201,8 @@ private struct OpportunityFilters: View {
         accessToken: nil,
         avatarImage: nil,
         profileName: nil,
+        unreadNotificationCount: 0,
+        onNotificationsTap: {},
         onAvatarTap: {}
     )
 }
