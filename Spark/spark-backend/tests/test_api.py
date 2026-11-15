@@ -20,7 +20,11 @@ def test_full_user_scenario() -> None:
         with httpx.Client(base_url=BASE_URL, timeout=10) as client:
             health = client.get("/health")
             assert health.status_code == 200
-            assert health.json() == {"status": "ok"}
+            assert health.json() == {"status": "ok", "database": "ok"}
+
+            liveness = client.get("/health/live")
+            assert liveness.status_code == 200
+            assert liveness.json() == {"status": "ok"}
 
             opportunities = client.get("/api/v1/opportunities")
             assert opportunities.status_code == 200

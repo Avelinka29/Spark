@@ -8,7 +8,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, status
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import delete, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
@@ -48,7 +48,16 @@ app = FastAPI(title="Spark Backend API", version="0.1.0")
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
+async def health(session: AsyncSession = Depends(get_session)) -> dict[str, str]:
+    try:
+        await session.execute(text("SELECT 1"))
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Database is unavailable") from error
+    return {"status": "ok", "database": "ok"}
+
+
+@app.get("/health/live")
+async def liveness() -> dict[str, str]:
     return {"status": "ok"}
 
 
