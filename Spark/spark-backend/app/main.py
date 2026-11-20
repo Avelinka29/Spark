@@ -8,7 +8,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, status
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
-from sqlalchemy import delete, or_, select, text, update
+from sqlalchemy import and_, delete, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
@@ -16,7 +16,7 @@ from starlette.concurrency import run_in_threadpool
 from .config import get_settings
 from .database import get_session
 from .email_service import send_auth_code
-from .models import Achievement, Application, ApplicationStatus, AuthCode, AuthCodePurpose, Bookmark, Notification, Opportunity, Project, ProjectRole, User
+from .models import Achievement, Application, ApplicationStatus, AuthCode, AuthCodePurpose, Bookmark, ChatMember, ChatMessage, Friendship, FriendshipStatus, Notification, Opportunity, Project, ProjectChat, ProjectRole, User
 from .schemas import (
     LoginRequest,
     ApplicationResponse,
@@ -24,12 +24,18 @@ from .schemas import (
     AchievementCreate,
     AchievementResponse,
     AvatarRequest,
+    ChatMessageCreate,
+    ChatMessageResponse,
+    ChatResponse,
     EmailRequest,
+    FriendResponse,
     GoogleAuthRequest,
     MessageResponse,
     NotificationResponse,
     OpportunityResponse,
     ProfileResponse,
+    ProfileUpdate,
+    PublicProfileResponse,
     ProjectCreate,
     ProjectResponse,
     ProjectUpdate,
@@ -578,8 +584,54 @@ async def decide_application(
             )
             .values(status=ApplicationStatus.rejected)
         )
+        await create_project_chat_if_team_complete(project, session)
     await session.commit()
     return application_response(application, applicant, role, project)
+
+
+async def create_project_chat_if_team_complete(
+    project: Project,
+    session: AsyncSession,
+) -> ProjectChat | None:
+    open_roles = await session.scalar(
+        select(func.count(ProjectRole.id)).where(
+            ProjectRole.project_id == project.id,
+            ProjectRole.is_open.is_(True),
+        )
+    )
+    if open_roles:
+        return None
+
+    chat = await session.scalar(select(ProjectChat).where(ProjectChat.project_id == project.id))
+    if chat is None:
+        chat = ProjectChat(project_id=project.id)
+        session.add(chat)
+        await session.flush()
+
+    accepted_user_ids = set(
+        await session.scalars(
+            select(Application.user_id)
+            .join(ProjectRole, ProjectRole.id == Application.project_role_id)
+            .where(
+                ProjectRole.project_id == project.id,
+                Application.status == ApplicationStatus.accepted,
+            )
+        )
+    )
+    member_ids = accepted_user_ids | {project.owner_id}
+    existing_ids = set(
+        await session.scalars(select(ChatMember.user_id).where(ChatMember.chat_id == chat.id))
+    )
+    for member_id in member_ids - existing_ids:
+        session.add(ChatMember(chat_id=chat.id, user_id=member_id))
+        session.add(
+            Notification(
+                user_id=member_id,
+                title="Команда собрана",
+                message=f"Проект «{project.title}» готов к работе. Проектный чат уже открыт.",
+            )
+        )
+    return chat
 
 
 @app.delete("/api/v1/applications/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -602,6 +654,308 @@ async def cancel_application(
 @app.get("/api/v1/profile/me", response_model=ProfileResponse)
 async def my_profile(user: User = Depends(current_user)) -> User:
     return user
+
+
+@app.patch("/api/v1/profile/me", response_model=ProfileResponse)
+async def update_my_profile(
+    payload: ProfileUpdate,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> User:
+    for field, value in payload.model_dump(exclude_none=True).items():
+        if isinstance(value, list):
+            value = [item.strip() for item in value if item.strip()]
+        setattr(user, field, value)
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+async def friendship_between(
+    first_id: uuid.UUID,
+    second_id: uuid.UUID,
+    session: AsyncSession,
+) -> Friendship | None:
+    return await session.scalar(
+        select(Friendship).where(
+            or_(
+                and_(Friendship.requester_id == first_id, Friendship.addressee_id == second_id),
+                and_(Friendship.requester_id == second_id, Friendship.addressee_id == first_id),
+            )
+        )
+    )
+
+
+def friendship_label(friendship: Friendship | None, user_id: uuid.UUID) -> str:
+    if friendship is None:
+        return "none"
+    if friendship.status == FriendshipStatus.accepted:
+        return "friends"
+    return "pending_sent" if friendship.requester_id == user_id else "pending_received"
+
+
+@app.get("/api/v1/profiles/{profile_id}", response_model=PublicProfileResponse)
+async def public_profile(
+    profile_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> PublicProfileResponse:
+    profile = await session.get(User, profile_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    status_value = "self" if profile.id == user.id else friendship_label(
+        await friendship_between(user.id, profile.id, session), user.id
+    )
+    return PublicProfileResponse(
+        id=profile.id,
+        name=profile.name,
+        region=profile.region,
+        bio=profile.bio,
+        skills=profile.skills,
+        interests=profile.interests,
+        friendship_status=status_value,
+    )
+
+
+@app.get("/api/v1/profiles/{profile_id}/avatar", response_model=AvatarRequest)
+async def public_profile_avatar(
+    profile_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> AvatarRequest:
+    profile = await session.get(User, profile_id)
+    if profile is None or profile.avatar_data is None:
+        raise HTTPException(status_code=404, detail="Avatar not found")
+    return AvatarRequest(
+        data=base64.b64encode(profile.avatar_data).decode(),
+        content_type=profile.avatar_content_type or "image/jpeg",
+    )
+
+
+@app.get("/api/v1/friends", response_model=list[FriendResponse])
+async def list_friends(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[FriendResponse]:
+    friendships = list(
+        await session.scalars(
+            select(Friendship)
+            .where(or_(Friendship.requester_id == user.id, Friendship.addressee_id == user.id))
+            .order_by(Friendship.created_at.desc())
+        )
+    )
+    responses: list[FriendResponse] = []
+    for friendship in friendships:
+        other_id = friendship.addressee_id if friendship.requester_id == user.id else friendship.requester_id
+        other = await session.get(User, other_id)
+        if other is not None:
+            responses.append(
+                FriendResponse(
+                    friendship_id=friendship.id,
+                    user_id=other.id,
+                    name=other.name,
+                    region=other.region,
+                    status=friendship_label(friendship, user.id),
+                )
+            )
+    return responses
+
+
+@app.post("/api/v1/friends/{profile_id}", response_model=FriendResponse, status_code=status.HTTP_201_CREATED)
+async def request_friendship(
+    profile_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> FriendResponse:
+    if profile_id == user.id:
+        raise HTTPException(status_code=409, detail="Cannot add yourself as a friend")
+    other = await session.get(User, profile_id)
+    if other is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    existing = await friendship_between(user.id, profile_id, session)
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="Friendship already exists")
+    friendship = Friendship(requester_id=user.id, addressee_id=profile_id)
+    session.add(friendship)
+    session.add(
+        Notification(
+            user_id=profile_id,
+            title="Новая заявка в друзья",
+            message=f"{user.name} хочет добавить вас в друзья.",
+        )
+    )
+    await session.commit()
+    await session.refresh(friendship)
+    return FriendResponse(
+        friendship_id=friendship.id,
+        user_id=other.id,
+        name=other.name,
+        region=other.region,
+        status="pending_sent",
+    )
+
+
+@app.patch("/api/v1/friends/{friendship_id}/accept", response_model=FriendResponse)
+async def accept_friendship(
+    friendship_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> FriendResponse:
+    friendship = await session.get(Friendship, friendship_id)
+    if friendship is None or friendship.addressee_id != user.id:
+        raise HTTPException(status_code=404, detail="Friend request not found")
+    friendship.status = FriendshipStatus.accepted
+    requester = await session.get(User, friendship.requester_id)
+    session.add(
+        Notification(
+            user_id=friendship.requester_id,
+            title="Заявка принята",
+            message=f"{user.name} теперь у вас в друзьях.",
+        )
+    )
+    await session.commit()
+    return FriendResponse(
+        friendship_id=friendship.id,
+        user_id=friendship.requester_id,
+        name=requester.name if requester else "Пользователь",
+        region=requester.region if requester else "",
+        status="friends",
+    )
+
+
+@app.delete("/api/v1/friends/{friendship_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_friendship(
+    friendship_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    friendship = await session.get(Friendship, friendship_id)
+    if friendship is None or user.id not in (friendship.requester_id, friendship.addressee_id):
+        raise HTTPException(status_code=404, detail="Friendship not found")
+    await session.delete(friendship)
+    await session.commit()
+
+
+async def require_chat_member(
+    chat_id: uuid.UUID,
+    user_id: uuid.UUID,
+    session: AsyncSession,
+) -> ProjectChat:
+    chat = await session.get(ProjectChat, chat_id)
+    membership = await session.scalar(
+        select(ChatMember).where(ChatMember.chat_id == chat_id, ChatMember.user_id == user_id)
+    )
+    if chat is None or membership is None:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return chat
+
+
+@app.get("/api/v1/chats", response_model=list[ChatResponse])
+async def list_chats(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ChatResponse]:
+    rows = (
+        await session.execute(
+            select(ProjectChat, Project)
+            .join(ChatMember, ChatMember.chat_id == ProjectChat.id)
+            .join(Project, Project.id == ProjectChat.project_id)
+            .where(ChatMember.user_id == user.id)
+            .order_by(ProjectChat.created_at.desc())
+        )
+    ).all()
+    responses: list[ChatResponse] = []
+    for chat, project in rows:
+        member_count = await session.scalar(
+            select(func.count(ChatMember.id)).where(ChatMember.chat_id == chat.id)
+        )
+        last_message = await session.scalar(
+            select(ChatMessage)
+            .where(ChatMessage.chat_id == chat.id)
+            .order_by(ChatMessage.created_at.desc())
+            .limit(1)
+        )
+        responses.append(
+            ChatResponse(
+                id=chat.id,
+                project_id=project.id,
+                project_title=project.title,
+                member_count=member_count or 0,
+                last_message=last_message.text if last_message else None,
+                last_message_at=last_message.created_at if last_message else None,
+            )
+        )
+    return responses
+
+
+@app.get("/api/v1/chats/{chat_id}/messages", response_model=list[ChatMessageResponse])
+async def list_chat_messages(
+    chat_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ChatMessageResponse]:
+    await require_chat_member(chat_id, user.id, session)
+    rows = (
+        await session.execute(
+            select(ChatMessage, User)
+            .join(User, User.id == ChatMessage.sender_id)
+            .where(ChatMessage.chat_id == chat_id)
+            .order_by(ChatMessage.created_at.asc())
+            .limit(500)
+        )
+    ).all()
+    return [
+        ChatMessageResponse(
+            id=message.id,
+            chat_id=message.chat_id,
+            sender_id=message.sender_id,
+            sender_name=sender.name,
+            text=message.text,
+            created_at=message.created_at,
+        )
+        for message, sender in rows
+    ]
+
+
+@app.post(
+    "/api/v1/chats/{chat_id}/messages",
+    response_model=ChatMessageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def send_chat_message(
+    chat_id: uuid.UUID,
+    payload: ChatMessageCreate,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ChatMessageResponse:
+    chat = await require_chat_member(chat_id, user.id, session)
+    message = ChatMessage(chat_id=chat.id, sender_id=user.id, text=payload.text.strip())
+    session.add(message)
+    project = await session.get(Project, chat.project_id)
+    recipient_ids = await session.scalars(
+        select(ChatMember.user_id).where(
+            ChatMember.chat_id == chat.id,
+            ChatMember.user_id != user.id,
+        )
+    )
+    for recipient_id in recipient_ids:
+        session.add(
+            Notification(
+                user_id=recipient_id,
+                title=project.title if project else "Новое сообщение",
+                message=f"{user.name}: {message.text[:120]}",
+            )
+        )
+    await session.commit()
+    await session.refresh(message)
+    return ChatMessageResponse(
+        id=message.id,
+        chat_id=message.chat_id,
+        sender_id=message.sender_id,
+        sender_name=user.name,
+        text=message.text,
+        created_at=message.created_at,
+    )
 
 
 @app.delete("/api/v1/profile/me", status_code=status.HTTP_204_NO_CONTENT)

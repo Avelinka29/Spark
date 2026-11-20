@@ -6,11 +6,28 @@ import uuid
 import httpx
 from sqlalchemy import delete
 
-from app.database import SessionFactory
+from app.database import SessionFactory, engine
 from app.models import User
 
 
 BASE_URL = os.getenv("TEST_BASE_URL", "http://api:8000")
+
+
+def create_verified_user(client: httpx.Client, email: str, name: str) -> dict[str, str]:
+    password = "spark-social-password"
+    registration = client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "password": password, "name": name},
+    )
+    assert registration.status_code == 201
+    verification = client.post(
+        "/api/v1/auth/verify-email",
+        json={"email": email, "code": registration.json()["development_code"]},
+    )
+    assert verification.status_code == 200
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert login.status_code == 200
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
 
 
 def test_full_user_scenario() -> None:
@@ -243,3 +260,98 @@ async def delete_test_user(email: str) -> None:
     async with SessionFactory() as session:
         await session.execute(delete(User).where(User.email == email))
         await session.commit()
+    await engine.dispose()
+
+
+def test_social_profile_and_project_chat() -> None:
+    owner_email = f"spark-owner-{uuid.uuid4()}@example.com"
+    member_email = f"spark-member-{uuid.uuid4()}@example.com"
+    try:
+        with httpx.Client(base_url=BASE_URL, timeout=10) as client:
+            owner_headers = create_verified_user(client, owner_email, "Owner Test")
+            member_headers = create_verified_user(client, member_email, "Member Test")
+
+            updated = client.patch(
+                "/api/v1/profile/me",
+                headers=member_headers,
+                json={
+                    "region": "Минск",
+                    "bio": "iOS developer",
+                    "skills": ["Swift", "SwiftUI"],
+                    "interests": ["EdTech"],
+                },
+            )
+            assert updated.status_code == 200
+            member_id = updated.json()["id"]
+            owner_id = client.get("/api/v1/profile/me", headers=owner_headers).json()["id"]
+
+            public_profile = client.get(f"/api/v1/profiles/{member_id}", headers=owner_headers)
+            assert public_profile.status_code == 200
+            assert public_profile.json()["skills"] == ["Swift", "SwiftUI"]
+
+            friend_request = client.post(f"/api/v1/friends/{member_id}", headers=owner_headers)
+            assert friend_request.status_code == 201
+            friendship_id = friend_request.json()["friendship_id"]
+            accepted_friend = client.patch(
+                f"/api/v1/friends/{friendship_id}/accept",
+                headers=member_headers,
+            )
+            assert accepted_friend.status_code == 200
+            assert accepted_friend.json()["status"] == "friends"
+            owner_friends = client.get("/api/v1/friends", headers=owner_headers)
+            assert owner_friends.status_code == 200
+            assert member_id in {item["user_id"] for item in owner_friends.json()}
+
+            project_response = client.post(
+                "/api/v1/projects",
+                headers=owner_headers,
+                json={
+                    "category": "EdTech",
+                    "title": "Social Integration Project",
+                    "summary": "A project that verifies automatic team chat creation.",
+                    "owner_role": "Founder",
+                    "roles": [{"title": "iOS Developer", "skills": "SwiftUI"}],
+                },
+            )
+            assert project_response.status_code == 201
+            project = project_response.json()
+            role_id = project["roles"][0]["id"]
+
+            application = client.post(
+                f"/api/v1/project-roles/{role_id}/applications",
+                headers=member_headers,
+            )
+            assert application.status_code == 201
+            decision = client.patch(
+                f"/api/v1/applications/{application.json()['id']}",
+                headers=owner_headers,
+                json={"status": "accepted"},
+            )
+            assert decision.status_code == 200
+
+            owner_chats = client.get("/api/v1/chats", headers=owner_headers)
+            member_chats = client.get("/api/v1/chats", headers=member_headers)
+            assert owner_chats.status_code == 200
+            assert member_chats.status_code == 200
+            assert len(owner_chats.json()) == 1
+            chat_id = owner_chats.json()[0]["id"]
+            assert owner_chats.json()[0]["member_count"] == 2
+
+            sent = client.post(
+                f"/api/v1/chats/{chat_id}/messages",
+                headers=member_headers,
+                json={"text": "Команда, начинаем работу!"},
+            )
+            assert sent.status_code == 201
+            messages = client.get(f"/api/v1/chats/{chat_id}/messages", headers=owner_headers)
+            assert messages.status_code == 200
+            assert messages.json()[-1]["text"] == "Команда, начинаем работу!"
+            owner_notifications = client.get("/api/v1/notifications", headers=owner_headers)
+            assert any("Команда, начинаем" in item["message"] for item in owner_notifications.json())
+
+            removed = client.delete(f"/api/v1/friends/{friendship_id}", headers=owner_headers)
+            assert removed.status_code == 204
+            assert owner_id != member_id
+    finally:
+        asyncio.run(delete_test_user(owner_email))
+        asyncio.run(delete_test_user(member_email))

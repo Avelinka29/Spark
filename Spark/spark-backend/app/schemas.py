@@ -142,6 +142,54 @@ class ProfileResponse(BaseModel):
     interests: list[str]
 
 
+class ProfileUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    region: str | None = Field(default=None, max_length=120)
+    bio: str | None = Field(default=None, max_length=1000)
+    skills: list[str] | None = Field(default=None, max_length=30)
+    interests: list[str] | None = Field(default=None, max_length=30)
+
+
+class PublicProfileResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    region: str
+    bio: str
+    skills: list[str]
+    interests: list[str]
+    friendship_status: Literal["none", "pending_sent", "pending_received", "friends", "self"]
+
+
+class FriendResponse(BaseModel):
+    friendship_id: uuid.UUID
+    user_id: uuid.UUID
+    name: str
+    region: str
+    status: Literal["pending_sent", "pending_received", "friends"]
+
+
+class ChatResponse(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    project_title: str
+    member_count: int
+    last_message: str | None = None
+    last_message_at: datetime | None = None
+
+
+class ChatMessageCreate(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class ChatMessageResponse(BaseModel):
+    id: uuid.UUID
+    chat_id: uuid.UUID
+    sender_id: uuid.UUID
+    sender_name: str
+    text: str
+    created_at: datetime
+
+
 class AchievementCreate(BaseModel):
     title: str = Field(min_length=2, max_length=200)
     issuer: str = Field(min_length=2, max_length=160)
