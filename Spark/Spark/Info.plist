@@ -5,9 +5,21 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.1089503089556-p28dlgfsq891l1b5oouscub8ueq18us6</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>by.spark.profile</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>spark</string>
 			</array>
 		</dict>
 	</array>

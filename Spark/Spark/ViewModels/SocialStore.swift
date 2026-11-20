@@ -10,6 +10,7 @@ final class SocialStore {
     private(set) var viewedProfile: PublicProfileDTO?
     private(set) var isLoading = false
     private(set) var errorMessage: String?
+    private(set) var pendingProfileID: UUID?
 
     private let token: String?
 
@@ -158,5 +159,21 @@ final class SocialStore {
             return UUID(uuidString: String(value))
         }
         return nil
+    }
+
+    func openProfileURL(_ url: URL) {
+        guard let profileID = profileID(from: url.absoluteString) else {
+            errorMessage = "Ссылка не содержит профиль Spark."
+            return
+        }
+        pendingProfileID = profileID
+    }
+
+    func consumePendingProfile() {
+        pendingProfileID = nil
+    }
+
+    func reportError(_ message: String) {
+        errorMessage = message
     }
 }

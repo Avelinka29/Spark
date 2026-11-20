@@ -73,6 +73,39 @@ final class ProfileStore {
         }
     }
 
+    func updateProfile(
+        name: String,
+        region: String,
+        bio: String,
+        skills: [String],
+        interests: [String]
+    ) async -> Bool {
+        guard let token else { return false }
+        do {
+            let response: ProfileDTO = try await APIClient.shared.send(
+                path: "profile/me",
+                method: "PATCH",
+                body: ProfileUpdateRequest(
+                    name: name,
+                    region: region,
+                    bio: bio,
+                    skills: skills,
+                    interests: interests
+                ),
+                token: token
+            )
+            let achievements = profile?.achievements ?? []
+            var updatedProfile = response.makeProfile()
+            updatedProfile.achievements = achievements
+            profile = updatedProfile
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func deleteAchievement(id: UUID) async {
         guard let token else { return }
         do {

@@ -435,6 +435,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Spark/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Spark использует камеру для сканирования QR-кодов профилей и добавления друзей.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Spark использует Face ID для безопасной разблокировки сохранённой сессии.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Spark подключается к Spark Backend в локальной сети для разработки и тестирования приложения.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Можно глянуть, где ты сейчас?";
@@ -468,6 +469,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Spark/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Spark использует камеру для сканирования QR-кодов профилей и добавления друзей.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Spark использует Face ID для безопасной разблокировки сохранённой сессии.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Spark подключается к Spark Backend в локальной сети для разработки и тестирования приложения.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Можно глянуть, где ты сейчас?";

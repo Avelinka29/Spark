@@ -18,6 +18,7 @@ struct ProfileView: View {
                         onAvatarSelected: store.updateAvatar,
                         onAddAchievement: store.addAchievement,
                         onDeleteAchievement: store.deleteAchievement,
+                        onUpdateProfile: store.updateProfile,
                         onDeleteAccount: store.deleteAccount,
                         isBiometricEnabled: isBiometricEnabled,
                         canUseBiometrics: canUseBiometrics,
@@ -59,6 +60,7 @@ private struct ProfileContent: View {
     let onAvatarSelected: (Data) -> Void
     let onAddAchievement: (String, String, Date) async -> Bool
     let onDeleteAchievement: (UUID) async -> Void
+    let onUpdateProfile: (String, String, String, [String], [String]) async -> Bool
     let onDeleteAccount: () async -> Bool
     let isBiometricEnabled: Bool
     let canUseBiometrics: Bool
@@ -67,6 +69,7 @@ private struct ProfileContent: View {
 
     @State private var showSettings = false
     @State private var showAchievementForm = false
+    @State private var showProfileEditor = false
 
     var body: some View {
         ScrollView {
@@ -83,6 +86,17 @@ private struct ProfileContent: View {
                     region: profile.region,
                     bio: profile.bio
                 )
+
+                if canEditAvatar {
+                    Button {
+                        showProfileEditor = true
+                    } label: {
+                        Label("Редактировать профиль", systemImage: "pencil")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(.horizontal, 24)
+                }
 
                 ProfileTagsSection(title: "Навыки", tags: profile.skills)
                 ProfileTagsSection(title: "Интересы", tags: profile.interests)
@@ -119,6 +133,96 @@ private struct ProfileContent: View {
                 return saved
             }
         }
+        .sheet(isPresented: $showProfileEditor) {
+            ProfileEditView(profile: profile) { name, region, bio, skills, interests in
+                let saved = await onUpdateProfile(name, region, bio, skills, interests)
+                if saved {
+                    showProfileEditor = false
+                }
+                return saved
+            }
+        }
+    }
+}
+
+private struct ProfileEditView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let onSave: (String, String, String, [String], [String]) async -> Bool
+
+    @State private var name: String
+    @State private var region: String
+    @State private var bio: String
+    @State private var skillsText: String
+    @State private var interestsText: String
+    @State private var isSaving = false
+
+    init(
+        profile: UserProfile,
+        onSave: @escaping (String, String, String, [String], [String]) async -> Bool
+    ) {
+        self.onSave = onSave
+        _name = State(initialValue: profile.name)
+        _region = State(initialValue: profile.region)
+        _bio = State(initialValue: profile.bio)
+        _skillsText = State(initialValue: profile.skills.joined(separator: ", "))
+        _interestsText = State(initialValue: profile.interests.joined(separator: ", "))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Основное") {
+                    TextField("Имя", text: $name)
+                    TextField("Регион", text: $region)
+                    TextField("О себе", text: $bio, axis: .vertical)
+                        .lineLimit(3...6)
+                }
+
+                Section("Навыки") {
+                    TextField("Swift, дизайн, маркетинг", text: $skillsText, axis: .vertical)
+                    Text("Разделяйте навыки запятыми.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Интересы") {
+                    TextField("EdTech, стартапы, волонтёрство", text: $interestsText, axis: .vertical)
+                    Text("Разделяйте интересы запятыми.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Редактирование")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отмена") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Сохранить") {
+                        isSaving = true
+                        Task {
+                            _ = await onSave(
+                                name.trimmingCharacters(in: .whitespacesAndNewlines),
+                                region.trimmingCharacters(in: .whitespacesAndNewlines),
+                                bio.trimmingCharacters(in: .whitespacesAndNewlines),
+                                commaSeparatedValues(skillsText),
+                                commaSeparatedValues(interestsText)
+                            )
+                            isSaving = false
+                        }
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 || isSaving)
+                }
+            }
+        }
+    }
+
+    private func commaSeparatedValues(_ text: String) -> [String] {
+        text.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 }
 

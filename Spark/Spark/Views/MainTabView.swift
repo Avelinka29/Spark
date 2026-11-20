@@ -6,6 +6,7 @@ struct MainTabView: View {
     @State private var projectStore: ProjectStore
     @State private var profileStore: ProfileStore
     @State private var notificationStore: NotificationStore
+    @State private var socialStore: SocialStore
     @State private var showAuthenticationRequired = false
     @State private var showNotifications = false
 
@@ -30,6 +31,7 @@ struct MainTabView: View {
         _projectStore = State(initialValue: ProjectStore(token: accessToken))
         _profileStore = State(initialValue: ProfileStore(token: accessToken))
         _notificationStore = State(initialValue: NotificationStore(token: accessToken))
+        _socialStore = State(initialValue: SocialStore(token: accessToken))
     }
 
     var body: some View {
@@ -51,7 +53,7 @@ struct MainTabView: View {
                         if accessToken == nil {
                             onLogout()
                         } else {
-                            selectedTab = 3
+                            selectedTab = 4
                         }
                     }
                 )
@@ -75,6 +77,15 @@ struct MainTabView: View {
                     }
                     .tag(2)
 
+                SocialView(
+                    store: socialStore,
+                    currentUserID: profileStore.profile?.id
+                )
+                    .tabItem {
+                        Label("Сообщество", systemImage: "person.2")
+                    }
+                    .tag(3)
+
                 ProfileView(
                     store: profileStore,
                     isBiometricEnabled: isBiometricEnabled,
@@ -85,7 +96,7 @@ struct MainTabView: View {
                     .tabItem {
                         Label("Профиль", systemImage: "person")
                     }
-                    .tag(3)
+                    .tag(4)
             }
 
             if selectedTab == 0 || selectedTab == 2 {
@@ -118,7 +129,24 @@ struct MainTabView: View {
         .task {
             async let profileLoad: Void = profileStore.load()
             async let notificationLoad: Void = notificationStore.load()
-            _ = await (profileLoad, notificationLoad)
+            async let socialLoad: Void = socialStore.load()
+            _ = await (profileLoad, notificationLoad, socialLoad)
+        }
+        .task(id: accessToken) {
+            guard accessToken != nil else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                await notificationStore.load()
+                await socialStore.load()
+            }
+        }
+        .onOpenURL { url in
+            guard accessToken != nil else {
+                showAuthenticationRequired = true
+                return
+            }
+            socialStore.openProfileURL(url)
+            selectedTab = 3
         }
         .sheet(isPresented: $showCreateProject) {
             CreateProjectView(store: projectStore)

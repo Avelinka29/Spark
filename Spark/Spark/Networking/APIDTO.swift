@@ -232,6 +232,84 @@ struct ProfileDTO: Decodable {
     }
 }
 
+struct ProfileUpdateRequest: Encodable {
+    let name: String
+    let region: String
+    let bio: String
+    let skills: [String]
+    let interests: [String]
+}
+
+struct PublicProfileDTO: Identifiable, Decodable, Equatable {
+    let id: UUID
+    let name: String
+    let region: String
+    let bio: String
+    let skills: [String]
+    let interests: [String]
+    let friendshipStatus: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, region, bio, skills, interests
+        case friendshipStatus = "friendship_status"
+    }
+}
+
+struct FriendDTO: Identifiable, Decodable, Equatable {
+    let friendshipID: UUID
+    let userID: UUID
+    let name: String
+    let region: String
+    let status: String
+
+    var id: UUID { friendshipID }
+
+    enum CodingKeys: String, CodingKey {
+        case name, region, status
+        case friendshipID = "friendship_id"
+        case userID = "user_id"
+    }
+}
+
+struct ChatDTO: Identifiable, Decodable, Equatable {
+    let id: UUID
+    let projectID: UUID
+    let projectTitle: String
+    let memberCount: Int
+    let lastMessage: String?
+    let lastMessageAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case projectID = "project_id"
+        case projectTitle = "project_title"
+        case memberCount = "member_count"
+        case lastMessage = "last_message"
+        case lastMessageAt = "last_message_at"
+    }
+}
+
+struct ChatMessageDTO: Identifiable, Decodable, Equatable {
+    let id: UUID
+    let chatID: UUID
+    let senderID: UUID
+    let senderName: String
+    let text: String
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, text
+        case chatID = "chat_id"
+        case senderID = "sender_id"
+        case senderName = "sender_name"
+        case createdAt = "created_at"
+    }
+}
+
+struct ChatMessageCreateRequest: Encodable {
+    let text: String
+}
+
 struct AchievementDTO: Identifiable, Codable {
     let id: UUID?
     let title: String

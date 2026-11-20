@@ -68,7 +68,7 @@ struct SocialView: View {
                     if let id = store.profileID(from: value) {
                         selectedProfile = ScannedProfile(id: id)
                     } else {
-                        store.errorMessage = "QR-код не содержит ссылку на профиль Spark."
+                        store.reportError("QR-код не содержит ссылку на профиль Spark.")
                     }
                 }
             }
@@ -87,6 +87,11 @@ struct SocialView: View {
                 }
             } message: {
                 Text("Вставьте ссылку Spark или идентификатор профиля.")
+            }
+            .onChange(of: store.pendingProfileID) { _, profileID in
+                guard let profileID else { return }
+                selectedProfile = ScannedProfile(id: profileID)
+                store.consumePendingProfile()
             }
             .sheet(item: $selectedProfile) { profile in
                 PublicProfileView(
