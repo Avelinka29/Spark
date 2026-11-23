@@ -701,6 +701,16 @@ async def decide_application(
     if project.owner_id != user.id:
         raise HTTPException(status_code=403, detail="Only the project owner can decide applications")
 
+    # Serialize decisions for a project so that two accepted applications cannot
+    # occupy one role or race while creating the team's chat.
+    await session.execute(select(Project.id).where(Project.id == project.id).with_for_update())
+    await session.refresh(application)
+    await session.refresh(role)
+    if application.status != ApplicationStatus.pending:
+        raise HTTPException(status_code=409, detail="Application has already been decided")
+    if payload.status == "accepted" and not role.is_open:
+        raise HTTPException(status_code=409, detail="Project role is already closed")
+
     application.status = ApplicationStatus(payload.status)
     decision_text = "принята" if payload.status == "accepted" else "отклонена"
     session.add(
@@ -729,13 +739,13 @@ async def create_project_chat_if_team_complete(
     project: Project,
     session: AsyncSession,
 ) -> ProjectChat | None:
-    open_roles = await session.scalar(
-        select(func.count(ProjectRole.id)).where(
-            ProjectRole.project_id == project.id,
-            ProjectRole.is_open.is_(True),
-        )
-    )
-    if open_roles:
+    roles = list(await session.scalars(select(ProjectRole).where(ProjectRole.project_id == project.id)))
+    accepted_role_ids = set(await session.scalars(
+        select(Application.project_role_id)
+        .join(ProjectRole, ProjectRole.id == Application.project_role_id)
+        .where(ProjectRole.project_id == project.id, Application.status == ApplicationStatus.accepted)
+    ))
+    if not roles or any(role.is_open or role.id not in accepted_role_ids for role in roles):
         return None
 
     chat = await session.scalar(select(ProjectChat).where(ProjectChat.project_id == project.id))

@@ -2,6 +2,7 @@ import asyncio
 import base64
 import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 from sqlalchemy import delete, text
@@ -320,12 +321,20 @@ def test_social_profile_and_project_chat() -> None:
                     "title": "Social Integration Project",
                     "summary": "A project that verifies automatic team chat creation.",
                     "owner_role": "Founder",
-                    "roles": [{"title": "iOS Developer", "skills": "SwiftUI"}],
+                    "roles": [
+                        {"title": "iOS Developer", "skills": "SwiftUI"},
+                        {"title": "Designer", "skills": "Design"},
+                    ],
                 },
             )
             assert project_response.status_code == 201
             project = project_response.json()
             role_id = project["roles"][0]["id"]
+            second_role_id = project["roles"][1]["id"]
+
+            closed = client.patch(f"/api/v1/project-roles/{second_role_id}", headers=owner_headers,
+                                  json={"is_open": False})
+            assert closed.status_code == 200
 
             application = client.post(
                 f"/api/v1/project-roles/{role_id}/applications",
@@ -338,6 +347,17 @@ def test_social_profile_and_project_chat() -> None:
                 json={"status": "accepted"},
             )
             assert decision.status_code == 200
+            assert client.patch(f"/api/v1/applications/{application.json()['id']}",
+                                headers=owner_headers, json={"status": "accepted"}).status_code == 409
+            assert client.get("/api/v1/chats", headers=owner_headers).json() == []
+
+            assert client.patch(f"/api/v1/project-roles/{second_role_id}", headers=owner_headers,
+                                json={"is_open": True}).status_code == 200
+            second_application = client.post(f"/api/v1/project-roles/{second_role_id}/applications",
+                                             headers=member_headers)
+            assert second_application.status_code == 201
+            assert client.patch(f"/api/v1/applications/{second_application.json()['id']}",
+                                headers=owner_headers, json={"status": "accepted"}).status_code == 200
 
             owner_chats = client.get("/api/v1/chats", headers=owner_headers)
             member_chats = client.get("/api/v1/chats", headers=member_headers)
@@ -486,3 +506,32 @@ def test_user_can_propose_event_and_admin_can_publish_it() -> None:
     finally:
         asyncio.run(delete_test_user(user_email))
         asyncio.run(delete_test_user(admin_email))
+
+
+def test_simultaneous_applications_only_fill_role_once() -> None:
+    emails = [f"spark-race-{uuid.uuid4()}@example.com" for _ in range(3)]
+    try:
+        with httpx.Client(base_url=BASE_URL, timeout=10) as client:
+            owner, first, second = [create_verified_user(client, email, "Race Test") for email in emails]
+            project = client.post("/api/v1/projects", headers=owner, json={
+                "category": "IT", "title": "Concurrent decisions", "summary": "Concurrent application review",
+                "owner_role": "Founder", "roles": [{"title": "Developer", "skills": "Swift"}],
+            }).json()
+            role_id = project["roles"][0]["id"]
+            applications = [client.post(f"/api/v1/project-roles/{role_id}/applications", headers=headers).json()
+                            for headers in (first, second)]
+
+            def decide(application: dict) -> int:
+                with httpx.Client(base_url=BASE_URL, timeout=10) as other_client:
+                    return other_client.patch(f"/api/v1/applications/{application['id']}",
+                                              headers=owner, json={"status": "accepted"}).status_code
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                statuses = sorted(pool.map(decide, applications))
+            assert statuses == [200, 409]
+            chats = client.get("/api/v1/chats", headers=owner).json()
+            assert len(chats) == 1
+            assert chats[0]["member_count"] == 2
+    finally:
+        for email in emails:
+            asyncio.run(delete_test_user(email))

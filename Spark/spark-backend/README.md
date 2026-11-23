@@ -43,6 +43,10 @@ overwrite an existing account and cannot run outside development. These credenti
 are publicly known and must never be used for a public deployment. Development Compose
 mounts the local `app` directory; restart the API container after Python changes.
 
+Project chats are created after every project role has an accepted applicant. Closing
+a role without accepting an applicant does not complete the team. Decisions for a
+project are serialized to prevent simultaneous approvals from filling one role twice.
+
 ## Production preparation
 
 `docker-compose.production.yml` is a hardened starting point for a single server. It does not expose PostgreSQL publicly and refuses to start without the required secrets, Google client ID and SMTP credentials.
