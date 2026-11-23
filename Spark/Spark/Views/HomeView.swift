@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     let accessToken: String?
+    var refreshID: UUID = UUID()
     let avatarImage: UIImage?
     let profileName: String?
     let unreadNotificationCount: Int
@@ -70,7 +71,7 @@ struct HomeView: View {
                 }
             }
             .navigationBarBackButtonHidden(true)
-            .task {
+            .task(id: refreshID) {
                 await model.load()
             }
             .overlay(alignment: .bottom) {

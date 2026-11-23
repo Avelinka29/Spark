@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_sender: str = ""
     allow_development_codes: bool = False
+    admin_emails: str = ""
+
+    def is_admin_email(self, email: str) -> bool:
+        allowed = {item.strip().lower() for item in self.admin_emails.split(",") if item.strip()}
+        return email.strip().lower() in allowed
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

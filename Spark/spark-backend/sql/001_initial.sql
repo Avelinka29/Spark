@@ -15,6 +15,8 @@ CREATE TABLE users (
     interests VARCHAR[] NOT NULL DEFAULT '{}',
     avatar_data BYTEA,
     avatar_content_type VARCHAR(32),
+    account_type VARCHAR(24) NOT NULL DEFAULT 'user',
+    organization_name VARCHAR(160),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -34,6 +36,7 @@ CREATE INDEX ix_auth_codes_purpose ON auth_codes(purpose);
 
 CREATE TABLE opportunities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
     category VARCHAR(50) NOT NULL,
     title VARCHAR(200) NOT NULL,
     summary TEXT NOT NULL,
@@ -52,6 +55,7 @@ CREATE TABLE opportunities (
 
 CREATE INDEX ix_opportunities_category ON opportunities(category);
 CREATE INDEX ix_opportunities_published ON opportunities(published);
+CREATE INDEX ix_opportunities_owner_id ON opportunities(owner_id);
 
 CREATE TABLE projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -105,6 +109,17 @@ CREATE TABLE notifications (
 
 CREATE INDEX ix_notifications_user_id ON notifications(user_id);
 CREATE INDEX ix_notifications_is_read ON notifications(is_read);
+
+CREATE TABLE event_proposals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    event_data JSONB NOT NULL,
+    message TEXT NOT NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX ix_event_proposals_author_id ON event_proposals(author_id);
+CREATE INDEX ix_event_proposals_status ON event_proposals(status);
 
 CREATE TYPE friendshipstatus AS ENUM ('pending', 'accepted');
 

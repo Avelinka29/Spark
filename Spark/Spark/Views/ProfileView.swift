@@ -6,6 +6,7 @@ struct ProfileView: View {
     let canUseBiometrics: Bool
     let onBiometricChange: (Bool) async -> Bool
     let onLogout: () -> Void
+    let onOpportunityCreated: () -> Void
 
     var body: some View {
         NavigationStack {
@@ -13,12 +14,16 @@ struct ProfileView: View {
                 if let profile = store.profile {
                     ProfileContent(
                         profile: profile,
+                        store: store,
                         avatarImage: store.avatarImage,
                         canEditAvatar: store.isAuthenticated,
                         onAvatarSelected: store.updateAvatar,
                         onAddAchievement: store.addAchievement,
                         onDeleteAchievement: store.deleteAchievement,
                         onUpdateProfile: store.updateProfile,
+                        onEnableOrganization: store.enableOrganization,
+                        onCreateOpportunity: store.createOpportunity,
+                        onOpportunityCreated: onOpportunityCreated,
                         onDeleteAccount: store.deleteAccount,
                         isBiometricEnabled: isBiometricEnabled,
                         canUseBiometrics: canUseBiometrics,
@@ -55,12 +60,16 @@ struct ProfileView: View {
 
 private struct ProfileContent: View {
     let profile: UserProfile
+    let store: ProfileStore
     let avatarImage: UIImage?
     let canEditAvatar: Bool
     let onAvatarSelected: (Data) -> Void
     let onAddAchievement: (String, String, Date) async -> Bool
     let onDeleteAchievement: (UUID) async -> Void
     let onUpdateProfile: (String, String, String, [String], [String]) async -> Bool
+    let onEnableOrganization: (String) async -> Bool
+    let onCreateOpportunity: (OpportunityCreateRequest) async -> Bool
+    let onOpportunityCreated: () -> Void
     let onDeleteAccount: () async -> Bool
     let isBiometricEnabled: Bool
     let canUseBiometrics: Bool
@@ -70,6 +79,10 @@ private struct ProfileContent: View {
     @State private var showSettings = false
     @State private var showAchievementForm = false
     @State private var showProfileEditor = false
+    @State private var showOrganizationSetup = false
+    @State private var showOpportunityCreator = false
+    @State private var showEventProposal = false
+    @State private var showAdminProposals = false
 
     var body: some View {
         ScrollView {
@@ -97,6 +110,15 @@ private struct ProfileContent: View {
                     .buttonStyle(.bordered)
                     .padding(.horizontal, 24)
                 }
+
+                OrganizationActionsSection(
+                    accountType: profile.accountType,
+                    organizationName: profile.organizationName,
+                    onSetup: { showOrganizationSetup = true },
+                    onCreateOpportunity: { showOpportunityCreator = true },
+                    onProposeEvent: { showEventProposal = true },
+                    onReviewProposals: { showAdminProposals = true }
+                )
 
                 ProfileTagsSection(title: "Навыки", tags: profile.skills)
                 ProfileTagsSection(title: "Интересы", tags: profile.interests)
@@ -132,6 +154,22 @@ private struct ProfileContent: View {
                 }
                 return saved
             }
+        }
+        .sheet(isPresented: $showOrganizationSetup) {
+            OrganizationSetupView(onSave: onEnableOrganization)
+        }
+        .sheet(isPresented: $showOpportunityCreator) {
+            OpportunityCreateView { request in
+                let saved = await onCreateOpportunity(request)
+                if saved { onOpportunityCreated() }
+                return saved
+            }
+        }
+        .sheet(isPresented: $showEventProposal) {
+            EventProposalView(onSend: store.proposeEvent)
+        }
+        .sheet(isPresented: $showAdminProposals) {
+            AdminEventProposalsView(store: store, onApproved: onOpportunityCreated)
         }
         .sheet(isPresented: $showProfileEditor) {
             ProfileEditView(profile: profile) { name, region, bio, skills, interests in
@@ -406,6 +444,56 @@ private struct ProfileIdentitySection: View {
     }
 }
 
+private struct OrganizationActionsSection: View {
+    let accountType: String
+    let organizationName: String?
+    let onSetup: () -> Void
+    let onCreateOpportunity: () -> Void
+    let onProposeEvent: () -> Void
+    let onReviewProposals: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if accountType == "organization" || accountType == "admin" {
+                Label(
+                    accountType == "admin" ? "Администратор Spark" : (organizationName ?? "Организация"),
+                    systemImage: accountType == "admin" ? "checkmark.shield.fill" : "building.2.fill"
+                )
+                .font(.title3.bold())
+
+                Button(action: onCreateOpportunity) {
+                    Label("Добавить мероприятие", systemImage: "calendar.badge.plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.primaryLitePurple)
+
+                if accountType == "admin" {
+                    Button(action: onReviewProposals) {
+                        Label("Предложения пользователей", systemImage: "tray.full")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            } else {
+                Button(action: onProposeEvent) {
+                    Label("Предложить событие администратору", systemImage: "paperplane")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.primaryLitePurple)
+
+                Button(action: onSetup) {
+                    Label("Создать профиль организации", systemImage: "building.2")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(.horizontal)
+    }
+}
+
 private struct ProfileTagsSection: View {
     let title: String
     let tags: [String]
@@ -549,6 +637,7 @@ private struct AchievementForm: View {
         isBiometricEnabled: false,
         canUseBiometrics: true,
         onBiometricChange: { _ in true },
-        onLogout: {}
+        onLogout: {},
+        onOpportunityCreated: {}
     )
 }

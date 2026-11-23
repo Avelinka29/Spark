@@ -27,4 +27,6 @@ struct UserProfile: Identifiable, Equatable, Codable {
     var skills: [String]
     var interests: [String]
     var achievements: [Achievement]
+    var accountType: String = "user"
+    var organizationName: String? = nil
 }

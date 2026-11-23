@@ -9,6 +9,7 @@ struct MainTabView: View {
     @State private var socialStore: SocialStore
     @State private var showAuthenticationRequired = false
     @State private var showNotifications = false
+    @State private var opportunitiesRefreshID = UUID()
 
     private let accessToken: String?
     private let isBiometricEnabled: Bool
@@ -39,6 +40,7 @@ struct MainTabView: View {
             TabView(selection: $selectedTab) {
                 HomeView(
                     accessToken: accessToken,
+                    refreshID: opportunitiesRefreshID,
                     avatarImage: profileStore.avatarImage,
                     profileName: profileStore.profile?.name,
                     unreadNotificationCount: notificationStore.unreadCount,
@@ -62,7 +64,7 @@ struct MainTabView: View {
                     }
                     .tag(0)
 
-                MapView(accessToken: accessToken)
+                MapView(accessToken: accessToken, refreshID: opportunitiesRefreshID)
                     .tabItem {
                         Label("Карта", systemImage: "map")
                     }
@@ -91,7 +93,11 @@ struct MainTabView: View {
                     isBiometricEnabled: isBiometricEnabled,
                     canUseBiometrics: canUseBiometrics,
                     onBiometricChange: onBiometricChange,
-                    onLogout: onLogout
+                    onLogout: onLogout,
+                    onOpportunityCreated: {
+                        opportunitiesRefreshID = UUID()
+                        selectedTab = 1
+                    }
                 )
                     .tabItem {
                         Label("Профиль", systemImage: "person")

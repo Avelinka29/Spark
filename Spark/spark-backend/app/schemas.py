@@ -74,6 +74,40 @@ class OpportunityResponse(BaseModel):
     reward: int | None
 
 
+class OpportunityCreate(BaseModel):
+    category: str = Field(min_length=2, max_length=50)
+    title: str = Field(min_length=3, max_length=200)
+    summary: str = Field(min_length=3, max_length=1000)
+    details: str = Field(min_length=3, max_length=5000)
+    image_url: str | None = None
+    location_name: str = Field(min_length=2, max_length=160)
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    starts_at: date | None = None
+    ends_at: date | None = None
+    deadline: date | None = None
+    reward: int | None = Field(default=None, ge=0)
+
+
+class EventProposalCreate(BaseModel):
+    event: OpportunityCreate
+    message: str = Field(min_length=3, max_length=2000)
+
+
+class EventProposalResponse(BaseModel):
+    id: uuid.UUID
+    author_id: uuid.UUID
+    author_name: str
+    event: OpportunityCreate
+    message: str
+    status: str
+    created_at: datetime
+
+
+class EventProposalDecision(BaseModel):
+    status: Literal["approved", "rejected"]
+
+
 class RoleCreate(BaseModel):
     title: str = Field(min_length=2, max_length=120)
     skills: str = ""
@@ -140,6 +174,8 @@ class ProfileResponse(BaseModel):
     bio: str
     skills: list[str]
     interests: list[str]
+    account_type: str = "user"
+    organization_name: str | None = None
 
 
 class ProfileUpdate(BaseModel):
@@ -148,6 +184,10 @@ class ProfileUpdate(BaseModel):
     bio: str | None = Field(default=None, max_length=1000)
     skills: list[str] | None = Field(default=None, max_length=30)
     interests: list[str] | None = Field(default=None, max_length=30)
+
+
+class OrganizationProfileUpdate(BaseModel):
+    organization_name: str = Field(min_length=2, max_length=160)
 
 
 class PublicProfileResponse(BaseModel):

@@ -14,6 +14,28 @@ FastAPI API with PostgreSQL for Spark.
 The initial SQL schema is applied by PostgreSQL only when its Docker volume is first created.
 For deployed environments, add Alembic migrations before changing the schema.
 
+### Existing databases and administrators
+
+Back up the database before applying schema changes. For a database that already has
+the social/chat schema (`007_social_and_chat.sql`), apply the following once, in order:
+
+```sh
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/008_organization_accounts.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/009_event_proposals.sql
+```
+
+For older databases, inspect the schema and apply the missing numbered SQL files in
+order first. These scripts are not an automatic migration system. Fresh databases
+already receive the current schema from `001_initial.sql`; do not rerun seed data
+on an existing database without reviewing it.
+
+Set `ADMIN_EMAILS` to a comma-separated list of administrator email addresses before
+creating their accounts. Existing accounts are not promoted by changing this setting;
+an operator must explicitly update `users.account_type` to `admin` after verifying
+the account. Remove access explicitly if an administrator leaves. Users can currently
+switch themselves to an organization account and publish directly; this is an open
+product policy, not verification of an organization.
+
 ## Production preparation
 
 `docker-compose.production.yml` is a hardened starting point for a single server. It does not expose PostgreSQL publicly and refuses to start without the required secrets, Google client ID and SMTP credentials.

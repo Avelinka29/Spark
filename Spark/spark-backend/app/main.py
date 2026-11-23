@@ -16,7 +16,7 @@ from starlette.concurrency import run_in_threadpool
 from .config import get_settings
 from .database import get_session
 from .email_service import send_auth_code
-from .models import Achievement, Application, ApplicationStatus, AuthCode, AuthCodePurpose, Bookmark, ChatMember, ChatMessage, Friendship, FriendshipStatus, Notification, Opportunity, Project, ProjectChat, ProjectRole, User
+from .models import Achievement, Application, ApplicationStatus, AuthCode, AuthCodePurpose, Bookmark, ChatMember, ChatMessage, EventProposal, Friendship, FriendshipStatus, Notification, Opportunity, Project, ProjectChat, ProjectRole, User
 from .schemas import (
     LoginRequest,
     ApplicationResponse,
@@ -28,11 +28,16 @@ from .schemas import (
     ChatMessageResponse,
     ChatResponse,
     EmailRequest,
+    EventProposalCreate,
+    EventProposalDecision,
+    EventProposalResponse,
     FriendResponse,
     GoogleAuthRequest,
     MessageResponse,
     NotificationResponse,
+    OpportunityCreate,
     OpportunityResponse,
+    OrganizationProfileUpdate,
     ProfileResponse,
     ProfileUpdate,
     PublicProfileResponse,
@@ -130,6 +135,7 @@ async def register(payload: RegisterRequest, session: AsyncSession = Depends(get
         password_hash=hash_password(payload.password),
         name=payload.name,
         email_verified=False,
+        account_type="admin" if get_settings().is_admin_email(payload.email) else "user",
     )
     session.add(user)
     await session.commit()
@@ -264,6 +270,7 @@ async def google_register(
         google_sub=subject,
         email_verified=True,
         name=name,
+        account_type="admin" if get_settings().is_admin_email(normalized_email) else "user",
     )
     session.add(user)
 
@@ -293,6 +300,128 @@ async def opportunity_details(opportunity_id: uuid.UUID, session: AsyncSession =
     if opportunity is None or not opportunity.published:
         raise HTTPException(status_code=404, detail="Opportunity not found")
     return opportunity
+
+
+@app.post("/api/v1/opportunities", response_model=OpportunityResponse, status_code=status.HTTP_201_CREATED)
+async def create_opportunity(
+    payload: OpportunityCreate,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Opportunity:
+    if user.account_type not in {"organization", "admin"}:
+        raise HTTPException(status_code=403, detail="Only organizations and administrators can publish opportunities")
+    opportunity = Opportunity(
+        owner_id=user.id,
+        organizer=user.organization_name or user.name,
+        **payload.model_dump(),
+    )
+    session.add(opportunity)
+    await session.commit()
+    await session.refresh(opportunity)
+    return opportunity
+
+
+@app.post("/api/v1/event-proposals", response_model=EventProposalResponse, status_code=status.HTTP_201_CREATED)
+async def propose_event(
+    payload: EventProposalCreate,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> EventProposalResponse:
+    proposal = EventProposal(
+        author_id=user.id,
+        event_data=payload.event.model_dump(mode="json"),
+        message=payload.message.strip(),
+    )
+    session.add(proposal)
+    admin_ids = list(await session.scalars(select(User.id).where(User.account_type == "admin")))
+    for admin_id in admin_ids:
+        session.add(Notification(
+            user_id=admin_id,
+            title="Новое предложение события",
+            message=f"{user.name} предлагает событие «{payload.event.title}».",
+        ))
+    await session.commit()
+    await session.refresh(proposal)
+    return EventProposalResponse(
+        id=proposal.id,
+        author_id=user.id,
+        author_name=user.name,
+        event=payload.event,
+        message=proposal.message,
+        status=proposal.status,
+        created_at=proposal.created_at,
+    )
+
+
+@app.get("/api/v1/event-proposals", response_model=list[EventProposalResponse])
+async def list_event_proposals(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[EventProposalResponse]:
+    if user.account_type != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    rows = (await session.execute(
+        select(EventProposal, User)
+        .join(User, User.id == EventProposal.author_id)
+        .order_by(EventProposal.created_at.desc())
+    )).all()
+    return [
+        EventProposalResponse(
+            id=proposal.id,
+            author_id=author.id,
+            author_name=author.name,
+            event=OpportunityCreate(**proposal.event_data),
+            message=proposal.message,
+            status=proposal.status,
+            created_at=proposal.created_at,
+        )
+        for proposal, author in rows
+    ]
+
+
+@app.patch("/api/v1/event-proposals/{proposal_id}", response_model=EventProposalResponse)
+async def decide_event_proposal(
+    proposal_id: uuid.UUID,
+    payload: EventProposalDecision,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> EventProposalResponse:
+    if user.account_type != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    proposal = await session.scalar(
+        select(EventProposal).where(EventProposal.id == proposal_id).with_for_update()
+    )
+    if proposal is None:
+        raise HTTPException(status_code=404, detail="Event proposal not found")
+    if proposal.status != "pending":
+        raise HTTPException(status_code=409, detail="Event proposal has already been reviewed")
+    author = await session.get(User, proposal.author_id)
+    if author is None:
+        raise HTTPException(status_code=404, detail="Proposal author not found")
+    event = OpportunityCreate(**proposal.event_data)
+    proposal.status = payload.status
+    if payload.status == "approved":
+        session.add(Opportunity(
+            owner_id=author.id,
+            organizer=author.organization_name or author.name,
+            **event.model_dump(),
+        ))
+    session.add(Notification(
+        user_id=author.id,
+        title="Предложение события рассмотрено",
+        message=f"Событие «{event.title}» {'опубликовано' if payload.status == 'approved' else 'отклонено'}.",
+    ))
+    await session.commit()
+    await session.refresh(proposal)
+    return EventProposalResponse(
+        id=proposal.id,
+        author_id=author.id,
+        author_name=author.name,
+        event=event,
+        message=proposal.message,
+        status=proposal.status,
+        created_at=proposal.created_at,
+    )
 
 
 @app.get("/api/v1/bookmarks", response_model=list[OpportunityResponse])
@@ -666,6 +795,20 @@ async def update_my_profile(
         if isinstance(value, list):
             value = [item.strip() for item in value if item.strip()]
         setattr(user, field, value)
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+@app.patch("/api/v1/profile/organization", response_model=ProfileResponse)
+async def enable_organization_profile(
+    payload: OrganizationProfileUpdate,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> User:
+    if user.account_type != "admin":
+        user.account_type = "organization"
+    user.organization_name = payload.organization_name.strip()
     await session.commit()
     await session.refresh(user)
     return user

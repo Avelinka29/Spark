@@ -488,10 +488,14 @@ struct LoginView: View {
         }
         .task {
             authStore.clearError()
-            if authStore.isAuthenticated && authStore.isBiometricEnabled {
+            guard await authStore.validateSavedSession() else {
+                showHome = false
+                return
+            }
+            if authStore.isBiometricEnabled {
                 showHome = await authStore.unlockWithBiometrics()
             } else {
-                showHome = authStore.isAuthenticated
+                showHome = true
             }
         }
         }

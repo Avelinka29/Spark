@@ -4,7 +4,7 @@ import os
 import uuid
 
 import httpx
-from sqlalchemy import delete
+from sqlalchemy import delete, text
 
 from app.database import SessionFactory, engine
 from app.models import User
@@ -263,6 +263,16 @@ async def delete_test_user(email: str) -> None:
     await engine.dispose()
 
 
+async def make_test_admin(email: str) -> None:
+    async with SessionFactory() as session:
+        await session.execute(
+            text("UPDATE users SET account_type = 'admin' WHERE email = :email"),
+            {"email": email},
+        )
+        await session.commit()
+    await engine.dispose()
+
+
 def test_social_profile_and_project_chat() -> None:
     owner_email = f"spark-owner-{uuid.uuid4()}@example.com"
     member_email = f"spark-member-{uuid.uuid4()}@example.com"
@@ -355,3 +365,97 @@ def test_social_profile_and_project_chat() -> None:
     finally:
         asyncio.run(delete_test_user(owner_email))
         asyncio.run(delete_test_user(member_email))
+
+
+def test_organization_can_publish_mapped_opportunity() -> None:
+    email = f"spark-organization-{uuid.uuid4()}@example.com"
+    try:
+        with httpx.Client(base_url=BASE_URL, timeout=10) as client:
+            headers = create_verified_user(client, email, "Organization Owner")
+            forbidden = client.post(
+                "/api/v1/opportunities",
+                headers=headers,
+                json={
+                    "category": "Мероприятия",
+                    "title": "Spark Demo Event",
+                    "summary": "Demo event on the map",
+                    "details": "An integration test event",
+                    "location_name": "Минск",
+                    "latitude": 53.9023,
+                    "longitude": 27.5619,
+                },
+            )
+            assert forbidden.status_code == 403
+
+            organization = client.patch(
+                "/api/v1/profile/organization",
+                headers=headers,
+                json={"organization_name": "Spark Test Organization"},
+            )
+            assert organization.status_code == 200
+            assert organization.json()["account_type"] == "organization"
+
+            created = client.post(
+                "/api/v1/opportunities",
+                headers=headers,
+                json={
+                    "category": "Мероприятия",
+                    "title": "Spark Demo Event",
+                    "summary": "Demo event on the map",
+                    "details": "An integration test event",
+                    "location_name": "Минск",
+                    "latitude": 53.9023,
+                    "longitude": 27.5619,
+                },
+            )
+            assert created.status_code == 201
+            assert created.json()["organizer"] == "Spark Test Organization"
+            listed = client.get("/api/v1/opportunities")
+            assert created.json()["id"] in {item["id"] for item in listed.json()}
+    finally:
+        asyncio.run(delete_test_user(email))
+
+
+def test_user_can_propose_event_and_admin_can_publish_it() -> None:
+    user_email = f"spark-proposer-{uuid.uuid4()}@example.com"
+    admin_email = f"spark-admin-{uuid.uuid4()}@example.com"
+    try:
+        with httpx.Client(base_url=BASE_URL, timeout=10) as client:
+            user_headers = create_verified_user(client, user_email, "Event Proposer")
+            admin_headers = create_verified_user(client, admin_email, "Event Admin")
+            asyncio.run(make_test_admin(admin_email))
+
+            proposed = client.post(
+                "/api/v1/event-proposals",
+                headers=user_headers,
+                json={
+                    "event": {
+                        "category": "Мероприятия",
+                        "title": "User Proposed Event",
+                        "summary": "Suggested for the Spark map",
+                        "details": "The administrator should review this event",
+                        "location_name": "Минск",
+                        "latitude": 53.9023,
+                        "longitude": 27.5619,
+                    },
+                    "message": "Пожалуйста, добавьте это событие на карту.",
+                },
+            )
+            assert proposed.status_code == 201
+            proposal_id = proposed.json()["id"]
+
+            inbox = client.get("/api/v1/event-proposals", headers=admin_headers)
+            assert inbox.status_code == 200
+            assert proposal_id in {item["id"] for item in inbox.json()}
+
+            approved = client.patch(
+                f"/api/v1/event-proposals/{proposal_id}",
+                headers=admin_headers,
+                json={"status": "approved"},
+            )
+            assert approved.status_code == 200
+            opportunities = client.get("/api/v1/opportunities")
+            assert "User Proposed Event" in {item["title"] for item in opportunities.json()}
+    finally:
+        asyncio.run(delete_test_user(user_email))
+        asyncio.run(delete_test_user(admin_email))

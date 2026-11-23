@@ -195,8 +195,29 @@ final class AuthStore {
         defaults.set(false, forKey: Self.biometricEnabledKey)
     }
 
+    func validateSavedSession() async -> Bool {
+        guard let accessToken else { return false }
+        do {
+            let _: ProfileDTO = try await APIClient.shared.send(
+                path: "profile/me",
+                token: accessToken
+            )
+            errorMessage = nil
+            return true
+        } catch APIError.server(let statusCode, _) where statusCode == 401 {
+            self.accessToken = nil
+            keychain.deleteToken()
+            defaults.set(false, forKey: Self.biometricEnabledKey)
+            errorMessage = "Сессия завершена. Войдите в аккаунт снова."
+            return false
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func unlockWithBiometrics() async -> Bool {
-        guard isAuthenticated, isBiometricEnabled else {
+        guard isBiometricEnabled, await validateSavedSession() else {
             return false
         }
 

@@ -218,6 +218,14 @@ struct ProfileDTO: Decodable {
     let bio: String
     let skills: [String]
     let interests: [String]
+    let accountType: String
+    let organizationName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, email, name, region, bio, skills, interests
+        case accountType = "account_type"
+        case organizationName = "organization_name"
+    }
 
     func makeProfile() -> UserProfile {
         UserProfile(
@@ -227,8 +235,67 @@ struct ProfileDTO: Decodable {
             bio: bio,
             skills: skills,
             interests: interests,
-            achievements: []
+            achievements: [],
+            accountType: accountType,
+            organizationName: organizationName
         )
+    }
+}
+
+struct OrganizationProfileRequest: Encodable {
+    let organizationName: String
+
+    enum CodingKeys: String, CodingKey {
+        case organizationName = "organization_name"
+    }
+}
+
+struct OpportunityCreateRequest: Codable {
+    let category: String
+    let title: String
+    let summary: String
+    let details: String
+    let imageURL: String?
+    let locationName: String
+    let latitude: Double
+    let longitude: Double
+    let startsAt: String?
+    let endsAt: String?
+    let deadline: String?
+    let reward: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case category, title, summary, details, latitude, longitude, deadline, reward
+        case imageURL = "image_url"
+        case locationName = "location_name"
+        case startsAt = "starts_at"
+        case endsAt = "ends_at"
+    }
+}
+
+struct EventProposalCreateRequest: Encodable {
+    let event: OpportunityCreateRequest
+    let message: String
+}
+
+struct EventProposalDecisionRequest: Encodable {
+    let status: String
+}
+
+struct EventProposalDTO: Identifiable, Decodable {
+    let id: UUID
+    let authorID: UUID
+    let authorName: String
+    let event: OpportunityCreateRequest
+    let message: String
+    let status: String
+    let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, event, message, status
+        case authorID = "author_id"
+        case authorName = "author_name"
+        case createdAt = "created_at"
     }
 }
 

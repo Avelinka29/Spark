@@ -8,6 +8,7 @@ final class ProfileStore {
     private(set) var avatarImage: UIImage?
     private(set) var isLoading = false
     private(set) var errorMessage: String?
+    private(set) var eventProposals: [EventProposalDTO] = []
 
     private let token: String?
 
@@ -99,6 +100,88 @@ final class ProfileStore {
             updatedProfile.achievements = achievements
             profile = updatedProfile
             errorMessage = nil
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func enableOrganization(name: String) async -> Bool {
+        guard let token else { return false }
+        do {
+            let response: ProfileDTO = try await APIClient.shared.send(
+                path: "profile/organization",
+                method: "PATCH",
+                body: OrganizationProfileRequest(organizationName: name),
+                token: token
+            )
+            var updated = response.makeProfile()
+            updated.achievements = profile?.achievements ?? []
+            profile = updated
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func createOpportunity(_ request: OpportunityCreateRequest) async -> Bool {
+        guard let token else { return false }
+        do {
+            let _: OpportunityDTO = try await APIClient.shared.send(
+                path: "opportunities",
+                method: "POST",
+                body: request,
+                token: token
+            )
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func proposeEvent(_ request: OpportunityCreateRequest, message: String) async -> Bool {
+        guard let token else { return false }
+        do {
+            let _: EventProposalDTO = try await APIClient.shared.send(
+                path: "event-proposals",
+                method: "POST",
+                body: EventProposalCreateRequest(event: request, message: message),
+                token: token
+            )
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func loadEventProposals() async {
+        guard let token else { return }
+        do {
+            eventProposals = try await APIClient.shared.send(path: "event-proposals", token: token)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @discardableResult
+    func decideEventProposal(id: UUID, approve: Bool) async -> Bool {
+        guard let token else { return false }
+        do {
+            let _: EventProposalDTO = try await APIClient.shared.send(
+                path: "event-proposals/\(id)",
+                method: "PATCH",
+                body: EventProposalDecisionRequest(status: approve ? "approved" : "rejected"),
+                token: token
+            )
+            await loadEventProposals()
             return true
         } catch {
             errorMessage = error.localizedDescription

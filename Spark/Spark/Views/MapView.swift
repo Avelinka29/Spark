@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MapView: View {
     let accessToken: String?
+    let refreshID: UUID
 
     @State private var model = MapViewModel()
     @State private var presentedOpportunity: Opportunity?
@@ -99,7 +100,7 @@ struct MapView: View {
                 )
             }
         }
-        .task {
+        .task(id: refreshID) {
             await model.load()
         }
     }
@@ -125,5 +126,5 @@ private struct MapLoadingErrorView: View {
 }
 
 #Preview {
-    MapView(accessToken: nil)
+    MapView(accessToken: nil, refreshID: UUID())
 }

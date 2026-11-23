@@ -33,6 +33,7 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:?Set SMTP_PASSWORD}
       SMTP_SENDER: ${SMTP_SENDER:?Set SMTP_SENDER}
       ALLOW_DEVELOPMENT_CODES: "false"
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
