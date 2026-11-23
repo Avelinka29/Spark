@@ -29,7 +29,7 @@ struct MapView: View {
             .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 20) {
-                MapSearchBar(text: $model.searchText)
+                MapSearchBar(text: $model.searchText, selectedCategory: $model.selectedCategory)
                     .padding(.horizontal, 20)
                     .padding(.top, -40)
 

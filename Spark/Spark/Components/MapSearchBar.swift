@@ -10,6 +10,7 @@ import SwiftUI
 struct MapSearchBar: View {
     
     @Binding var text: String
+    @Binding var selectedCategory: EventCategory
     
     var body: some View {
         HStack(spacing: 20) {
@@ -29,14 +30,24 @@ struct MapSearchBar: View {
             
             Spacer()
             
-            Button {
-                
-                //фильтры сюда добавлю позже
-            }
-            label: {Image(systemName: "slider.horizontal.3")
+            Menu {
+                Picker("Категория", selection: $selectedCategory) {
+                    ForEach(EventCategory.allCases, id: \.self) { category in
+                        Text(category.rawValue).tag(category)
+                    }
+                }
+            } label: {
+                Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(Color.primaryWhite)
+                    .overlay(alignment: .topTrailing) {
+                        if selectedCategory != .all {
+                            Circle().fill(.primaryLitePurple).frame(width: 8, height: 8)
+                                .offset(x: 5, y: -5)
+                        }
+                    }
             }
+            .accessibilityLabel("Фильтр по категории")
             
             if !text.isEmpty {
                 Button {
@@ -69,7 +80,7 @@ struct MapSearchBar: View {
 #Preview {
     ZStack {
         Color.blue
-        MapSearchBar(text: .constant(""))
+        MapSearchBar(text: .constant(""), selectedCategory: .constant(.all))
             .padding()
     }
 }

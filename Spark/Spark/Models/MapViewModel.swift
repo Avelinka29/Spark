@@ -141,6 +141,10 @@ final class MapViewModel: NSObject, @preconcurrency CLLocationManagerDelegate {
 
             return matchesCategory && matchesSearch
         }
+        if let selectedOpportunity,
+           !visibleOpportunities.contains(where: { $0.id == selectedOpportunity.id }) {
+            self.selectedOpportunity = nil
+        }
     }
 
     private func checkLocationAvailability() {
