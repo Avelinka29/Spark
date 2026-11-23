@@ -277,10 +277,12 @@ async def make_test_admin(email: str) -> None:
 def test_social_profile_and_project_chat() -> None:
     owner_email = f"spark-owner-{uuid.uuid4()}@example.com"
     member_email = f"spark-member-{uuid.uuid4()}@example.com"
+    stranger_email = f"spark-stranger-{uuid.uuid4()}@example.com"
     try:
         with httpx.Client(base_url=BASE_URL, timeout=10) as client:
             owner_headers = create_verified_user(client, owner_email, "Owner Test")
             member_headers = create_verified_user(client, member_email, "Member Test")
+            stranger_headers = create_verified_user(client, stranger_email, "Stranger Test")
 
             updated = client.patch(
                 "/api/v1/profile/me",
@@ -312,6 +314,22 @@ def test_social_profile_and_project_chat() -> None:
             owner_friends = client.get("/api/v1/friends", headers=owner_headers)
             assert owner_friends.status_code == 200
             assert member_id in {item["user_id"] for item in owner_friends.json()}
+
+            event_id = client.get("/api/v1/opportunities").json()[0]["id"]
+            attendance_url = f"/api/v1/opportunities/{event_id}/attendance"
+            assert client.post(f"/api/v1/opportunities/{event_id}/invite/{member_id}", headers=owner_headers).status_code == 204
+            assert client.post(f"/api/v1/opportunities/{event_id}/invite/{member_id}", headers=stranger_headers).status_code == 403
+            invitations = client.get("/api/v1/notifications", headers=member_headers).json()
+            assert any(item["title"] == "Приглашение на событие" for item in invitations)
+            assert client.put(attendance_url, headers=member_headers).status_code == 204
+            assert client.put(attendance_url, headers=member_headers).status_code == 204
+            state = client.get(attendance_url, headers=owner_headers).json()
+            assert state["going"] is False
+            assert [friend["id"] for friend in state["friends"]] == [member_id]
+            assert client.get(attendance_url, headers=stranger_headers).json()["friends"] == []
+            assert client.get(f"/api/v1/profiles/{member_id}", headers=owner_headers).json()["events"] == []
+            assert client.delete(attendance_url, headers=member_headers).status_code == 204
+            assert client.get(attendance_url, headers=owner_headers).json()["friends"] == []
 
             project_response = client.post(
                 "/api/v1/projects",
@@ -366,6 +384,24 @@ def test_social_profile_and_project_chat() -> None:
             assert len(owner_chats.json()) == 1
             chat_id = owner_chats.json()[0]["id"]
             assert owner_chats.json()[0]["member_count"] == 2
+            portfolio = client.get(f"/api/v1/profiles/{member_id}", headers=owner_headers).json()
+            assert any(item["title"] == "Social Integration Project" and item["role"] == "iOS Developer"
+                       for item in portfolio["projects"])
+
+            workspace_url = f"/api/v1/chats/{chat_id}/workspace"
+            assert client.get(workspace_url, headers=stranger_headers).status_code == 404
+            assert client.put(workspace_url, headers=owner_headers,
+                              json={"links": "https://example.com", "meeting": "Пятница 18:00"}).status_code == 200
+            assert client.get(workspace_url, headers=member_headers).json()["meeting"] == "Пятница 18:00"
+            tasks_url = f"/api/v1/chats/{chat_id}/tasks"
+            created_task = client.post(tasks_url, headers=owner_headers, json={"title": "Собрать прототип"})
+            assert created_task.status_code == 201
+            task_id = created_task.json()["id"]
+            assert client.patch(f"{tasks_url}/{task_id}", headers=member_headers, json={"done": True}).json()["done"]
+            assert client.get(tasks_url, headers=owner_headers).json()[0]["done"]
+            assert client.get(tasks_url).status_code == 401
+            assert client.get(tasks_url, headers=stranger_headers).status_code == 404
+            assert client.delete(f"{tasks_url}/{task_id}", headers=member_headers).status_code == 204
 
             sent = client.post(
                 f"/api/v1/chats/{chat_id}/messages",
@@ -385,6 +421,7 @@ def test_social_profile_and_project_chat() -> None:
     finally:
         asyncio.run(delete_test_user(owner_email))
         asyncio.run(delete_test_user(member_email))
+        asyncio.run(delete_test_user(stranger_email))
 
 
 def test_organization_can_publish_mapped_opportunity() -> None:
@@ -406,6 +443,7 @@ def test_organization_can_publish_mapped_opportunity() -> None:
                     "location_name": "Минск",
                     "latitude": 53.9023,
                     "longitude": 27.5619,
+                    "starts_at": "2000-01-01",
                 },
             )
             assert forbidden.status_code == 403
@@ -452,10 +490,22 @@ def test_organization_can_publish_mapped_opportunity() -> None:
                     "location_name": "Минск",
                     "latitude": 53.9023,
                     "longitude": 27.5619,
+                    "starts_at": "2000-01-01",
                 },
             )
             assert created.status_code == 201
             assert created.json()["organizer"] == "Spark Test Organization"
+            event_id = created.json()["id"]
+            attendance_url = f"/api/v1/opportunities/{event_id}/attendance"
+            assert client.put(f"{attendance_url}/attended", headers=headers).status_code == 409
+            assert client.put(attendance_url, headers=headers).status_code == 204
+            assert client.put(f"{attendance_url}/attended", headers=headers).status_code == 204
+            assert client.get(attendance_url, headers=headers).json()["attended"] is True
+            profile = client.get(f"/api/v1/profiles/{organization.json()['id']}", headers=admin_headers).json()
+            assert event_id in {item["id"] for item in profile["events"]}
+            assert client.delete(attendance_url, headers=headers).status_code == 204
+            profile = client.get(f"/api/v1/profiles/{organization.json()['id']}", headers=admin_headers).json()
+            assert event_id not in {item["id"] for item in profile["events"]}
             listed = client.get("/api/v1/opportunities")
             assert created.json()["id"] in {item["id"] for item in listed.json()}
     finally:

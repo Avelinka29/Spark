@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 struct OpportunityDetailsView: View {
     let opportunity: Opportunity
@@ -8,7 +9,12 @@ struct OpportunityDetailsView: View {
     @State private var isBookmarkLoading = false
     @State private var bookmarkError: String?
     @State private var bookmarkFeedbackTrigger = 0
-    @State private var hasApplied = false
+    @State private var isGoing = false
+    @State private var hasAttended = false
+    @State private var attendanceLoading = false
+    @State private var attendingFriends: [AttendingFriendDTO] = []
+    @State private var showInvite = false
+    @State private var reminderMessage: String?
     @State private var showAuthenticationRequired = false
 
     var body: some View {
@@ -61,32 +67,76 @@ struct OpportunityDetailsView: View {
 
                     Button {
                         if accessToken != nil {
-                            hasApplied = true
+                            Task { await toggleAttendance() }
                         } else {
                             showAuthenticationRequired = true
                         }
                     } label: {
-                        Text(hasApplied ? "Заявка отправлена" : "Подать заявку")
+                        Text(isGoing ? "Я собираюсь ✓" : "Я собираюсь")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.primaryLitePurple)
-                    .disabled(hasApplied)
+                    .disabled(attendanceLoading)
                 }
                 .padding(.horizontal)
+                if isGoing {
+                    Text("Это отметка для друзей, а не регистрация у организатора.")
+                        .font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
+                }
+                if isGoing && hasEventStarted {
+                    Button(hasAttended ? "Участие добавлено в портфолио" : "Я участвовал(а)") {
+                        Task { await markAttended() }
+                    }
+                    .disabled(hasAttended || attendanceLoading)
+                    .padding(.horizontal)
+                    Text("Участие появится в вашем профиле для пользователей Spark. Организатор его не подтверждал.")
+                        .font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
+                }
+                if !attendingFriends.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Друзья собираются").font(.headline)
+                        ForEach(attendingFriends) { friend in
+                            Label(friend.name, systemImage: "person.fill")
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                if accessToken != nil {
+                    Button {
+                        showInvite = true
+                    } label: {
+                        Label("Пригласить друга", systemImage: "person.badge.plus")
+                    }
+                    .padding(.horizontal)
+                }
+                if reminderDate != nil {
+                    Button {
+                        Task { await scheduleReminder() }
+                    } label: {
+                        Label("Напомнить за день до дедлайна", systemImage: "bell.badge")
+                    }
+                    .padding(.horizontal)
+                }
             }
             .padding(.bottom, 24)
         }
         .navigationTitle("Возможность")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showInvite) {
+            if let accessToken {
+                InviteFriendView(opportunityID: opportunity.id, token: accessToken)
+            }
+        }
         .sensoryFeedback(.success, trigger: bookmarkFeedbackTrigger)
         .task(id: opportunity.id) {
             await loadBookmarkState()
+            await loadAttendance()
         }
         .alert("Нужна авторизация", isPresented: $showAuthenticationRequired) {
             Button("Понятно", role: .cancel) {}
         } message: {
-            Text("Войдите в аккаунт, чтобы сохранять возможности и подавать заявки.")
+            Text("Войдите в аккаунт, чтобы сохранять возможности и отмечать планы.")
         }
         .alert("Не удалось сохранить", isPresented: Binding(
             get: { bookmarkError != nil },
@@ -95,6 +145,93 @@ struct OpportunityDetailsView: View {
             Button("Понятно", role: .cancel) {}
         } message: {
             Text(bookmarkError ?? "Неизвестная ошибка")
+        }
+        .alert("Напоминание", isPresented: Binding(
+            get: { reminderMessage != nil }, set: { if !$0 { reminderMessage = nil } }
+        )) {
+            Button("Понятно", role: .cancel) {}
+        } message: {
+            Text(reminderMessage ?? "")
+        }
+    }
+
+    private var reminderDate: Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.isLenient = false
+        guard let deadline = formatter.date(from: opportunity.deadlineText),
+              let previousDay = Calendar.current.date(byAdding: .day, value: -1, to: deadline),
+              let date = Calendar.current.date(bySettingHour: 10, minute: 0, second: 0, of: previousDay),
+              date > Date() else { return nil }
+        return date
+    }
+
+    private func scheduleReminder() async {
+        guard let date = reminderDate else { return }
+        do {
+            let center = UNUserNotificationCenter.current()
+            guard try await center.requestAuthorization(options: [.alert, .sound]) else {
+                reminderMessage = "Разрешите уведомления в настройках устройства."
+                return
+            }
+            let content = UNMutableNotificationContent()
+            content.title = "Скоро дедлайн"
+            content.body = "Завтра заканчивается приём заявок: \(opportunity.title)."
+            content.sound = .default
+            let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+            try await center.add(UNNotificationRequest(identifier: "deadline.\(opportunity.id)", content: content,
+                trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)))
+            reminderMessage = "Напомним за день до окончания приёма заявок в 10:00."
+        } catch { reminderMessage = error.localizedDescription }
+    }
+
+    private func loadAttendance() async {
+        guard let accessToken else { return }
+        do {
+            let state: AttendanceDTO = try await APIClient.shared.send(
+                path: "opportunities/\(opportunity.id)/attendance", token: accessToken)
+            isGoing = state.going
+            hasAttended = state.attended
+            attendingFriends = state.friends
+        } catch {
+            bookmarkError = error.localizedDescription
+        }
+    }
+
+    private var hasEventStarted: Bool {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let start = opportunity.dateText.components(separatedBy: " — ").first,
+              let date = formatter.date(from: start) else { return false }
+        return date <= Date()
+    }
+
+    private func markAttended() async {
+        guard let accessToken else { return }
+        attendanceLoading = true
+        defer { attendanceLoading = false }
+        do {
+            let _: EmptyResponse = try await APIClient.shared.send(
+                path: "opportunities/\(opportunity.id)/attendance/attended", method: "PUT", token: accessToken)
+            await loadAttendance()
+        } catch { bookmarkError = error.localizedDescription }
+    }
+
+    private func toggleAttendance() async {
+        guard let accessToken else { return }
+        attendanceLoading = true
+        defer { attendanceLoading = false }
+        do {
+            let _: EmptyResponse = try await APIClient.shared.send(
+                path: "opportunities/\(opportunity.id)/attendance",
+                method: isGoing ? "DELETE" : "PUT", token: accessToken)
+            await loadAttendance()
+        } catch {
+            bookmarkError = error.localizedDescription
         }
     }
 

@@ -3,6 +3,11 @@ import SwiftUI
 struct ProjectView: View {
     let store: ProjectStore
     let currentUserID: UUID?
+    var profile: UserProfile? = nil
+
+    private var recommendations: [ProjectRecommendation] {
+        ProjectRecommendations.matching(projects: store.projects, profile: profile)
+    }
 
     var body: some View {
         NavigationStack {
@@ -12,6 +17,31 @@ struct ProjectView: View {
                         projectsCount: store.projects.count,
                         rolesCount: store.openRolesCount
                     )
+
+                    if !recommendations.isEmpty {
+                        Text("Подходит тебе")
+                            .font(.title3.bold())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        ForEach(recommendations.prefix(3)) { recommendation in
+                            NavigationLink {
+                                ProjectDetailsView(project: recommendation.project, store: store, isOwner: false)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(recommendation.project.title).font(.headline)
+                                    ForEach(recommendation.reasons, id: \.self) { reason in
+                                        Text(reason).font(.subheadline).foregroundStyle(.secondary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else if profile != nil && profile?.skills.isEmpty == true && profile?.interests.isEmpty == true {
+                        Text("Добавь навыки и интересы в профиле, чтобы увидеть подходящие проекты.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
 
                     Text("Активные проекты")
                         .font(.title3.bold())

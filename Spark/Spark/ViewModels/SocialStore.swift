@@ -173,6 +173,36 @@ final class SocialStore {
         pendingProfileID = nil
     }
 
+    func workspace(chatID: UUID) async throws -> TeamWorkspaceDTO {
+        guard let token else { throw APIError.notAuthenticated }
+        return try await APIClient.shared.send(path: "chats/\(chatID)/workspace", token: token)
+    }
+
+    func saveWorkspace(chatID: UUID, value: TeamWorkspaceDTO) async throws {
+        guard let token else { throw APIError.notAuthenticated }
+        let _: TeamWorkspaceDTO = try await APIClient.shared.send(path: "chats/\(chatID)/workspace", method: "PUT", body: value, token: token)
+    }
+
+    func tasks(chatID: UUID) async throws -> [TeamTaskDTO] {
+        guard let token else { throw APIError.notAuthenticated }
+        return try await APIClient.shared.send(path: "chats/\(chatID)/tasks", token: token)
+    }
+
+    func createTask(chatID: UUID, title: String) async throws {
+        guard let token else { throw APIError.notAuthenticated }
+        let _: TeamTaskDTO = try await APIClient.shared.send(path: "chats/\(chatID)/tasks", method: "POST", body: TeamTaskCreateRequest(title: title), token: token)
+    }
+
+    func updateTask(chatID: UUID, task: TeamTaskDTO) async throws {
+        guard let token else { throw APIError.notAuthenticated }
+        let _: TeamTaskDTO = try await APIClient.shared.send(path: "chats/\(chatID)/tasks/\(task.id)", method: "PATCH", body: TeamTaskUpdateRequest(done: !task.done), token: token)
+    }
+
+    func deleteTask(chatID: UUID, taskID: UUID) async throws {
+        guard let token else { throw APIError.notAuthenticated }
+        let _: EmptyResponse = try await APIClient.shared.send(path: "chats/\(chatID)/tasks/\(taskID)", method: "DELETE", token: token)
+    }
+
     func reportError(_ message: String) {
         errorMessage = message
     }

@@ -271,6 +271,30 @@ struct OrganizationDecisionRequest: Encodable {
     let status: String
 }
 
+struct AttendingFriendDTO: Decodable, Identifiable {
+    let id: UUID
+    let name: String
+}
+
+struct AttendanceDTO: Decodable {
+    let going: Bool
+    let attended: Bool
+    let friends: [AttendingFriendDTO]
+}
+
+struct TeamTaskDTO: Decodable, Identifiable {
+    let id: UUID
+    let title: String
+    let done: Bool
+}
+
+struct TeamTaskCreateRequest: Encodable { let title: String }
+struct TeamTaskUpdateRequest: Encodable { let done: Bool }
+struct TeamWorkspaceDTO: Codable {
+    var links: String = ""
+    var meeting: String = ""
+}
+
 struct OpportunityCreateRequest: Codable {
     let category: String
     let title: String
@@ -336,10 +360,36 @@ struct PublicProfileDTO: Identifiable, Decodable, Equatable {
     let skills: [String]
     let interests: [String]
     let friendshipStatus: String
+    let projects: [PortfolioProjectDTO]
+    let events: [PortfolioEventDTO]
 
     enum CodingKeys: String, CodingKey {
-        case id, name, region, bio, skills, interests
+        case id, name, region, bio, skills, interests, projects, events
         case friendshipStatus = "friendship_status"
+    }
+}
+
+struct PortfolioEventDTO: Decodable, Identifiable, Equatable {
+    let id: UUID
+    let title: String
+    let startsAt: String?
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case startsAt = "starts_at"
+    }
+}
+
+struct PortfolioProjectDTO: Decodable, Identifiable, Equatable {
+    let projectID: UUID
+    let title: String
+    let role: String
+    let roleID: UUID?
+    var id: String { roleID?.uuidString ?? projectID.uuidString }
+
+    enum CodingKeys: String, CodingKey {
+        case projectID = "id"
+        case roleID = "role_id"
+        case title, role
     }
 }
 

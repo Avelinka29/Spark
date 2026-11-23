@@ -20,7 +20,8 @@ struct SocialView: View {
                         ProfileShareCard(
                             profileID: currentUserID,
                             onScan: { showScanner = true },
-                            onEnterLink: { showManualEntry = true }
+                            onEnterLink: { showManualEntry = true },
+                            onViewProfile: { selectedProfile = ScannedProfile(id: currentUserID) }
                         )
                     }
 
@@ -112,6 +113,7 @@ private struct ProfileShareCard: View {
     let profileID: UUID
     let onScan: () -> Void
     let onEnterLink: () -> Void
+    let onViewProfile: () -> Void
 
     private var profileURL: URL {
         URL(string: "spark://profile/\(profileID.uuidString)")!
@@ -150,6 +152,8 @@ private struct ProfileShareCard: View {
             }
 
             Button("Ввести ссылку вручную", action: onEnterLink)
+                .font(.footnote)
+            Button("Посмотреть мой профиль и портфолио", action: onViewProfile)
                 .font(.footnote)
         }
         .padding(20)
@@ -320,6 +324,28 @@ private struct PublicProfileView: View {
                         ProfileTagCloud(title: "Навыки", values: profile.skills)
                         ProfileTagCloud(title: "Интересы", values: profile.interests)
 
+                        if !profile.projects.isEmpty {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Проекты").font(.headline)
+                                ForEach(profile.projects) { project in
+                                    VStack(alignment: .leading) {
+                                        Text(project.title).font(.subheadline.bold())
+                                        Text(project.role).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        if !profile.events.isEmpty {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Мероприятия").font(.headline)
+                                Text("Участие указано пользователем и не подтверждено организатором.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                ForEach(profile.events) { event in
+                                    Label(event.title, systemImage: "calendar")
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
                         friendshipAction(profile)
                     }
                     .padding(24)
@@ -390,6 +416,7 @@ private struct ProjectChatView: View {
     let currentUserID: UUID?
 
     @State private var messageText = ""
+    @State private var showWorkspace = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -439,6 +466,13 @@ private struct ProjectChatView: View {
         }
         .navigationTitle(chat.projectTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            Button { showWorkspace = true } label: { Image(systemName: "checklist") }
+                .accessibilityLabel("Рабочее пространство команды")
+        }
+        .sheet(isPresented: $showWorkspace) {
+            TeamWorkspaceView(chat: chat, store: store)
+        }
         .task {
             while !Task.isCancelled {
                 await store.loadMessages(chatID: chat.id)

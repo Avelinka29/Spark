@@ -23,6 +23,8 @@ the social/chat schema (`007_social_and_chat.sql`), apply the following once, in
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/008_organization_accounts.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/009_event_proposals.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/010_organization_approval.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/011_opportunity_attendance.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/012_team_workspace.sql
 ```
 
 For older databases, inspect the schema and apply the missing numbered SQL files in
@@ -46,6 +48,15 @@ mounts the local `app` directory; restart the API container after Python changes
 Project chats are created after every project role has an accepted applicant. Closing
 a role without accepting an applicant does not complete the team. Decisions for a
 project are serialized to prevent simultaneous approvals from filling one role twice.
+
+Event plans are private to the user and their accepted friends. Invitations are sent
+as in-app notifications to friends only. A plan is not event registration. A user may
+separately add an event to their shareable profile after its start date; this is
+self-reported, not verified attendance. Accepted project roles and owned projects are
+also visible through the existing authenticated profile/QR flow. Deleting the plan
+removes its self-reported event entry. Chat members can manage shared tasks, links and
+meeting notes; progress is the fraction of completed tasks. The shared text fields use
+last-write-wins, so concurrent edits may overwrite each other.
 
 ## Production preparation
 

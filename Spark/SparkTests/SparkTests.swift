@@ -24,6 +24,21 @@ struct OpportunityModelTests {
     }
 }
 
+struct ProjectRecommendationTests {
+    @Test
+    func matchesSkillsAndInterestsOnlyForOpenRoles() {
+        let profile = UserProfile(id: UUID(), name: "Test", region: "", bio: "", skills: ["Swift"], interests: ["EdTech"], achievements: [])
+        let project = Project(category: "EdTech", title: "Project", summary: "Learning", ownerRole: "Founder", vacancies: [Vacancy(title: "iOS", roleDescription: "Swift")])
+        let matches = ProjectRecommendations.matching(projects: [project], profile: profile)
+        #expect(matches.count == 1)
+        #expect(matches.first?.reasons.count == 2)
+        var closed = project
+        closed.vacancies[0].isActive = false
+        #expect(ProjectRecommendations.matching(projects: [closed], profile: profile).isEmpty)
+        #expect(ProjectRecommendations.matching(projects: [project], profile: nil).isEmpty)
+    }
+}
+
 struct ProjectStoreTests {
     @Test @MainActor
     func `Open role count includes only active vacancies`() {

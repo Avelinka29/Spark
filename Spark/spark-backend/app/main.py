@@ -2,7 +2,7 @@ import hashlib
 import base64
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from google.auth.exceptions import GoogleAuthError
@@ -11,12 +11,13 @@ from google.oauth2 import id_token as google_id_token
 from sqlalchemy import and_, delete, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from starlette.concurrency import run_in_threadpool
 
 from .config import get_settings
 from .database import get_session
 from .email_service import send_auth_code
-from .models import Achievement, Application, ApplicationStatus, AuthCode, AuthCodePurpose, Bookmark, ChatMember, ChatMessage, EventProposal, Friendship, FriendshipStatus, Notification, Opportunity, Project, ProjectChat, ProjectRole, User
+from .models import Achievement, Application, ApplicationStatus, AuthCode, AuthCodePurpose, Bookmark, ChatMember, ChatMessage, EventProposal, Friendship, FriendshipStatus, Notification, Opportunity, OpportunityAttendance, Project, ProjectChat, ProjectRole, TeamTask, TeamWorkspace, User
 from .schemas import (
     LoginRequest,
     ApplicationResponse,
@@ -40,9 +41,17 @@ from .schemas import (
     OrganizationProfileUpdate,
     OrganizationApplicationResponse,
     OrganizationDecision,
+    AttendanceResponse,
+    AttendingFriend,
+    TeamTaskCreate,
+    TeamTaskUpdate,
+    TeamTaskResponse,
+    TeamWorkspaceData,
     ProfileResponse,
     ProfileUpdate,
     PublicProfileResponse,
+    PortfolioProject,
+    PortfolioEvent,
     ProjectCreate,
     ProjectResponse,
     ProjectUpdate,
@@ -429,6 +438,76 @@ async def decide_event_proposal(
         status=proposal.status,
         created_at=proposal.created_at,
     )
+
+
+@app.get("/api/v1/opportunities/{opportunity_id}/attendance", response_model=AttendanceResponse)
+async def attendance_state(opportunity_id: uuid.UUID, user: User = Depends(current_user),
+                           session: AsyncSession = Depends(get_session)) -> AttendanceResponse:
+    opportunity = await session.get(Opportunity, opportunity_id)
+    if opportunity is None or not opportunity.published:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    attendance = await session.scalar(select(OpportunityAttendance).where(
+        OpportunityAttendance.user_id == user.id, OpportunityAttendance.opportunity_id == opportunity_id))
+    friend_ids = select(Friendship.addressee_id).where(
+        Friendship.requester_id == user.id, Friendship.status == FriendshipStatus.accepted
+    ).union(select(Friendship.requester_id).where(
+        Friendship.addressee_id == user.id, Friendship.status == FriendshipStatus.accepted))
+    friends = (await session.scalars(select(User).join(
+        OpportunityAttendance, OpportunityAttendance.user_id == User.id
+    ).where(OpportunityAttendance.opportunity_id == opportunity_id, User.id.in_(friend_ids))
+        .order_by(User.name))).all()
+    return AttendanceResponse(going=attendance is not None, attended=attendance.attended if attendance else False,
+                              friends=[AttendingFriend(id=f.id, name=f.name) for f in friends])
+
+
+@app.put("/api/v1/opportunities/{opportunity_id}/attendance", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_going(opportunity_id: uuid.UUID, user: User = Depends(current_user),
+                     session: AsyncSession = Depends(get_session)) -> None:
+    opportunity = await session.get(Opportunity, opportunity_id)
+    if opportunity is None or not opportunity.published:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    await session.execute(pg_insert(OpportunityAttendance).values(id=uuid.uuid4(), user_id=user.id,
+        opportunity_id=opportunity_id).on_conflict_do_nothing(index_elements=["user_id", "opportunity_id"]))
+    await session.commit()
+
+
+@app.delete("/api/v1/opportunities/{opportunity_id}/attendance", status_code=status.HTTP_204_NO_CONTENT)
+async def unmark_going(opportunity_id: uuid.UUID, user: User = Depends(current_user),
+                       session: AsyncSession = Depends(get_session)) -> None:
+    await session.execute(delete(OpportunityAttendance).where(OpportunityAttendance.user_id == user.id,
+        OpportunityAttendance.opportunity_id == opportunity_id))
+    await session.commit()
+
+
+@app.put("/api/v1/opportunities/{opportunity_id}/attendance/attended", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_attended(opportunity_id: uuid.UUID, user: User = Depends(current_user),
+                        session: AsyncSession = Depends(get_session)) -> None:
+    opportunity = await session.get(Opportunity, opportunity_id)
+    if opportunity is None or not opportunity.published:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    if opportunity.starts_at is None or opportunity.starts_at > date.today():
+        raise HTTPException(status_code=409, detail="Attendance can be added after the event starts")
+    attendance = await session.scalar(select(OpportunityAttendance).where(
+        OpportunityAttendance.user_id == user.id, OpportunityAttendance.opportunity_id == opportunity_id))
+    if attendance is None:
+        raise HTTPException(status_code=409, detail="Mark your plans first")
+    attendance.attended = True
+    await session.commit()
+
+
+@app.post("/api/v1/opportunities/{opportunity_id}/invite/{friend_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def invite_to_opportunity(opportunity_id: uuid.UUID, friend_id: uuid.UUID,
+                                user: User = Depends(current_user),
+                                session: AsyncSession = Depends(get_session)) -> None:
+    opportunity = await session.get(Opportunity, opportunity_id)
+    if opportunity is None or not opportunity.published:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    friendship = await friendship_between(user.id, friend_id, session)
+    if friendship is None or friendship.status != FriendshipStatus.accepted:
+        raise HTTPException(status_code=403, detail="You can invite only friends")
+    session.add(Notification(user_id=friend_id, title="Приглашение на событие",
+                             message=f"{user.name} приглашает вас на «{opportunity.title}»."))
+    await session.commit()
 
 
 @app.get("/api/v1/bookmarks", response_model=list[OpportunityResponse])
@@ -908,6 +987,18 @@ async def public_profile(
     status_value = "self" if profile.id == user.id else friendship_label(
         await friendship_between(user.id, profile.id, session), user.id
     )
+    memberships = (await session.execute(
+        select(Project.id, Project.title, ProjectRole.title, ProjectRole.id)
+        .join(ProjectRole, ProjectRole.project_id == Project.id)
+        .join(Application, Application.project_role_id == ProjectRole.id)
+        .where(Application.user_id == profile.id, Application.status == ApplicationStatus.accepted)
+    )).all()
+    owned = (await session.execute(select(Project.id, Project.title, Project.owner_role)
+        .where(Project.owner_id == profile.id))).all()
+    attended_events = (await session.scalars(select(Opportunity).join(
+        OpportunityAttendance, OpportunityAttendance.opportunity_id == Opportunity.id
+    ).where(OpportunityAttendance.user_id == profile.id, OpportunityAttendance.attended.is_(True),
+            Opportunity.published.is_(True)))).all()
     return PublicProfileResponse(
         id=profile.id,
         name=profile.name,
@@ -916,6 +1007,9 @@ async def public_profile(
         skills=profile.skills,
         interests=profile.interests,
         friendship_status=status_value,
+        projects=([PortfolioProject(id=row[0], title=row[1], role=row[2]) for row in owned] +
+                  [PortfolioProject(id=row[0], title=row[1], role=row[2], role_id=row[3]) for row in memberships]),
+        events=[PortfolioEvent(id=event.id, title=event.title, starts_at=event.starts_at) for event in attended_events],
     )
 
 
@@ -1050,6 +1144,65 @@ async def require_chat_member(
     if chat is None or membership is None:
         raise HTTPException(status_code=404, detail="Chat not found")
     return chat
+
+
+@app.get("/api/v1/chats/{chat_id}/workspace", response_model=TeamWorkspaceData)
+async def get_workspace(chat_id: uuid.UUID, user: User = Depends(current_user),
+                        session: AsyncSession = Depends(get_session)) -> TeamWorkspaceData:
+    await require_chat_member(chat_id, user.id, session)
+    workspace = await session.get(TeamWorkspace, chat_id)
+    return TeamWorkspaceData(links=workspace.links, meeting=workspace.meeting) if workspace else TeamWorkspaceData()
+
+
+@app.put("/api/v1/chats/{chat_id}/workspace", response_model=TeamWorkspaceData)
+async def update_workspace(chat_id: uuid.UUID, payload: TeamWorkspaceData, user: User = Depends(current_user),
+                           session: AsyncSession = Depends(get_session)) -> TeamWorkspaceData:
+    await require_chat_member(chat_id, user.id, session)
+    await session.execute(pg_insert(TeamWorkspace).values(chat_id=chat_id, links=payload.links, meeting=payload.meeting)
+        .on_conflict_do_update(index_elements=["chat_id"], set_={"links": payload.links, "meeting": payload.meeting}))
+    await session.commit()
+    return payload
+
+
+@app.get("/api/v1/chats/{chat_id}/tasks", response_model=list[TeamTaskResponse])
+async def list_team_tasks(chat_id: uuid.UUID, user: User = Depends(current_user),
+                          session: AsyncSession = Depends(get_session)) -> list[TeamTask]:
+    await require_chat_member(chat_id, user.id, session)
+    return list(await session.scalars(select(TeamTask).where(TeamTask.chat_id == chat_id).order_by(TeamTask.created_at)))
+
+
+@app.post("/api/v1/chats/{chat_id}/tasks", response_model=TeamTaskResponse, status_code=status.HTTP_201_CREATED)
+async def create_team_task(chat_id: uuid.UUID, payload: TeamTaskCreate, user: User = Depends(current_user),
+                           session: AsyncSession = Depends(get_session)) -> TeamTask:
+    await require_chat_member(chat_id, user.id, session)
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="Task title cannot be empty")
+    task = TeamTask(chat_id=chat_id, title=title)
+    session.add(task)
+    await session.commit()
+    await session.refresh(task)
+    return task
+
+
+@app.patch("/api/v1/chats/{chat_id}/tasks/{task_id}", response_model=TeamTaskResponse)
+async def update_team_task(chat_id: uuid.UUID, task_id: uuid.UUID, payload: TeamTaskUpdate,
+                           user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> TeamTask:
+    await require_chat_member(chat_id, user.id, session)
+    task = await session.scalar(select(TeamTask).where(TeamTask.id == task_id, TeamTask.chat_id == chat_id))
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    task.done = payload.done
+    await session.commit()
+    return task
+
+
+@app.delete("/api/v1/chats/{chat_id}/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_team_task(chat_id: uuid.UUID, task_id: uuid.UUID, user: User = Depends(current_user),
+                           session: AsyncSession = Depends(get_session)) -> None:
+    await require_chat_member(chat_id, user.id, session)
+    await session.execute(delete(TeamTask).where(TeamTask.id == task_id, TeamTask.chat_id == chat_id))
+    await session.commit()
 
 
 @app.get("/api/v1/chats", response_model=list[ChatResponse])

@@ -117,6 +117,16 @@ class Bookmark(Base):
     opportunity_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("opportunities.id", ondelete="CASCADE"))
 
 
+class OpportunityAttendance(Base):
+    __tablename__ = "opportunity_attendance"
+    __table_args__ = (UniqueConstraint("user_id", "opportunity_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    opportunity_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("opportunities.id", ondelete="CASCADE"), index=True)
+    attended: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class Application(Base):
     __tablename__ = "applications"
     __table_args__ = (UniqueConstraint("user_id", "project_role_id"),)
@@ -187,6 +197,22 @@ class ChatMessage(Base):
     sender_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     text: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+
+
+class TeamTask(Base):
+    __tablename__ = "team_tasks"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("project_chats.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(300))
+    done: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class TeamWorkspace(Base):
+    __tablename__ = "team_workspaces"
+    chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("project_chats.id", ondelete="CASCADE"), primary_key=True)
+    links: Mapped[str] = mapped_column(Text, default="")
+    meeting: Mapped[str] = mapped_column(String(300), default="")
 
 
 class EventProposal(Base):

@@ -203,6 +203,50 @@ class OrganizationDecision(BaseModel):
     status: Literal["approved", "rejected"]
 
 
+class AttendingFriend(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class AttendanceResponse(BaseModel):
+    going: bool
+    attended: bool = False
+    friends: list[AttendingFriend]
+
+
+class TeamTaskCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+
+
+class TeamTaskUpdate(BaseModel):
+    done: bool
+
+
+class TeamTaskResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    title: str
+    done: bool
+
+
+class TeamWorkspaceData(BaseModel):
+    links: str = Field(default="", max_length=4000)
+    meeting: str = Field(default="", max_length=300)
+
+
+class PortfolioProject(BaseModel):
+    id: uuid.UUID
+    title: str
+    role: str
+    role_id: uuid.UUID | None = None
+
+
+class PortfolioEvent(BaseModel):
+    id: uuid.UUID
+    title: str
+    starts_at: date | None
+
+
 class PublicProfileResponse(BaseModel):
     id: uuid.UUID
     name: str
@@ -211,6 +255,8 @@ class PublicProfileResponse(BaseModel):
     skills: list[str]
     interests: list[str]
     friendship_status: Literal["none", "pending_sent", "pending_received", "friends", "self"]
+    projects: list[PortfolioProject] = []
+    events: list[PortfolioEvent] = []
 
 
 class FriendResponse(BaseModel):

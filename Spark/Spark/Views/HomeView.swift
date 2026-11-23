@@ -5,6 +5,7 @@ struct HomeView: View {
     var refreshID: UUID = UUID()
     let avatarImage: UIImage?
     let profileName: String?
+    var interests: [String] = []
     let unreadNotificationCount: Int
     let onNotificationsTap: () -> Void
     let onAvatarTap: () -> Void
@@ -26,6 +27,25 @@ struct HomeView: View {
                 )
 
                 Divider()
+
+                let recommendations = OpportunityRecommendations.matching(model.opportunities, interests: interests)
+                if !recommendations.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Для тебя").font(.title3.bold())
+                        ForEach(recommendations.prefix(3)) { item in
+                            NavigationLink {
+                                OpportunityDetailsView(opportunity: item.opportunity, accessToken: accessToken)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(item.opportunity.title).font(.headline)
+                                    Text(item.reason).font(.caption).foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding().background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                            }.buttonStyle(.plain)
+                        }
+                    }.padding(.horizontal)
+                }
 
                 LazyVStack(pinnedViews: [.sectionHeaders]) {
                     Section {

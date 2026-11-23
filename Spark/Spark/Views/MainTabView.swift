@@ -43,6 +43,7 @@ struct MainTabView: View {
                     refreshID: opportunitiesRefreshID,
                     avatarImage: profileStore.avatarImage,
                     profileName: profileStore.profile?.name,
+                    interests: accessToken == nil ? [] : (profileStore.profile?.interests ?? []),
                     unreadNotificationCount: notificationStore.unreadCount,
                     onNotificationsTap: {
                         if accessToken == nil {
@@ -72,7 +73,8 @@ struct MainTabView: View {
 
                 ProjectView(
                     store: projectStore,
-                    currentUserID: profileStore.profile?.id
+                    currentUserID: profileStore.profile?.id,
+                    profile: accessToken == nil ? nil : profileStore.profile
                 )
                     .tabItem {
                         Label("Проекты", systemImage: "folder")
