@@ -17,6 +17,7 @@ CREATE TABLE users (
     avatar_content_type VARCHAR(32),
     account_type VARCHAR(24) NOT NULL DEFAULT 'user',
     organization_name VARCHAR(160),
+    organization_status VARCHAR(24),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

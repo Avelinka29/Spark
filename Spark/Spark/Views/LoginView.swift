@@ -264,7 +264,11 @@ struct LoginView: View {
                                         password: userPassword
                                     )
                                     if succeeded {
-                                        showEmailVerification = true
+                                        if authStore.canUseBiometrics && !authStore.isBiometricEnabled {
+                                            showBiometricOffer = true
+                                        } else {
+                                            showHome = true
+                                        }
                                     }
                                 }
                             }
@@ -360,11 +364,7 @@ struct LoginView: View {
                                         password: userPassword
                                     )
                                     if succeeded {
-                                        if authStore.canUseBiometrics && !authStore.isBiometricEnabled {
-                                            showBiometricOffer = true
-                                        } else {
-                                            showHome = true
-                                        }
+                                        showEmailVerification = true
                                     }
                                 }
                             }

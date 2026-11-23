@@ -83,6 +83,7 @@ private struct ProfileContent: View {
     @State private var showOpportunityCreator = false
     @State private var showEventProposal = false
     @State private var showAdminProposals = false
+    @State private var showOrganizationApplications = false
 
     var body: some View {
         ScrollView {
@@ -114,10 +115,12 @@ private struct ProfileContent: View {
                 OrganizationActionsSection(
                     accountType: profile.accountType,
                     organizationName: profile.organizationName,
+                    organizationStatus: profile.organizationStatus,
                     onSetup: { showOrganizationSetup = true },
                     onCreateOpportunity: { showOpportunityCreator = true },
                     onProposeEvent: { showEventProposal = true },
-                    onReviewProposals: { showAdminProposals = true }
+                    onReviewProposals: { showAdminProposals = true },
+                    onReviewOrganizations: { showOrganizationApplications = true }
                 )
 
                 ProfileTagsSection(title: "Навыки", tags: profile.skills)
@@ -131,6 +134,7 @@ private struct ProfileContent: View {
             }
             .padding(.bottom, 32)
         }
+        .refreshable { await store.load() }
         .sheet(isPresented: $showSettings) {
             ProfileSettingsView(
                 isBiometricEnabled: isBiometricEnabled,
@@ -170,6 +174,9 @@ private struct ProfileContent: View {
         }
         .sheet(isPresented: $showAdminProposals) {
             AdminEventProposalsView(store: store, onApproved: onOpportunityCreated)
+        }
+        .sheet(isPresented: $showOrganizationApplications) {
+            OrganizationApplicationsView(store: store)
         }
         .sheet(isPresented: $showProfileEditor) {
             ProfileEditView(profile: profile) { name, region, bio, skills, interests in
@@ -447,10 +454,12 @@ private struct ProfileIdentitySection: View {
 private struct OrganizationActionsSection: View {
     let accountType: String
     let organizationName: String?
+    let organizationStatus: String?
     let onSetup: () -> Void
     let onCreateOpportunity: () -> Void
     let onProposeEvent: () -> Void
     let onReviewProposals: () -> Void
+    let onReviewOrganizations: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -469,6 +478,11 @@ private struct OrganizationActionsSection: View {
                 .tint(.primaryLitePurple)
 
                 if accountType == "admin" {
+                    Button(action: onReviewOrganizations) {
+                        Label("Заявки организаций", systemImage: "building.2.crop.circle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
                     Button(action: onReviewProposals) {
                         Label("Предложения пользователей", systemImage: "tray.full")
                             .frame(maxWidth: .infinity)
@@ -483,11 +497,21 @@ private struct OrganizationActionsSection: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.primaryLitePurple)
 
-                Button(action: onSetup) {
-                    Label("Создать профиль организации", systemImage: "building.2")
-                        .frame(maxWidth: .infinity)
+                if organizationStatus == "pending" {
+                    Label("Заявка организации на рассмотрении", systemImage: "clock")
+                        .foregroundStyle(.secondary)
+                } else {
+                    if organizationStatus == "rejected" {
+                        Text("Заявка отклонена. Вы можете отправить её снова.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button(action: onSetup) {
+                        Label("Подать заявку организации", systemImage: "building.2")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
             }
         }
         .padding(.horizontal)

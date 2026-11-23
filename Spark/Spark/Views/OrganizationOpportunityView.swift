@@ -13,7 +13,7 @@ struct OrganizationSetupView: View {
             Form {
                 Section("Профиль организации") {
                     TextField("Название организации", text: $organizationName)
-                    Text("После сохранения вы сможете публиковать мероприятия и возможности.")
+                    Text("Заявку рассмотрит администратор. После подтверждения вы сможете публиковать мероприятия и возможности.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -24,7 +24,7 @@ struct OrganizationSetupView: View {
                     Button("Отмена") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Сохранить") {
+                    Button("Отправить") {
                         Task {
                             isSaving = true
                             if await onSave(organizationName.trimmingCharacters(in: .whitespacesAndNewlines)) {

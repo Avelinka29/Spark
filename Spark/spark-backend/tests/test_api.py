@@ -369,9 +369,12 @@ def test_social_profile_and_project_chat() -> None:
 
 def test_organization_can_publish_mapped_opportunity() -> None:
     email = f"spark-organization-{uuid.uuid4()}@example.com"
+    admin_email = f"spark-reviewer-{uuid.uuid4()}@example.com"
     try:
         with httpx.Client(base_url=BASE_URL, timeout=10) as client:
             headers = create_verified_user(client, email, "Organization Owner")
+            admin_headers = create_verified_user(client, admin_email, "Reviewer")
+            asyncio.run(make_test_admin(admin_email))
             forbidden = client.post(
                 "/api/v1/opportunities",
                 headers=headers,
@@ -393,7 +396,30 @@ def test_organization_can_publish_mapped_opportunity() -> None:
                 json={"organization_name": "Spark Test Organization"},
             )
             assert organization.status_code == 200
-            assert organization.json()["account_type"] == "organization"
+            assert organization.json()["account_type"] == "user"
+            assert organization.json()["organization_status"] == "pending"
+            pending_publish = client.post(
+                "/api/v1/opportunities", headers={**headers, "Content-Type": "application/json"},
+                content=forbidden.request.content,
+            )
+            assert pending_publish.status_code == 403
+            assert client.patch("/api/v1/profile/organization", headers=headers,
+                                json={"organization_name": "Spark Test Organization"}).status_code == 409
+            assert client.get("/api/v1/organization-applications", headers=headers).status_code == 403
+            applications = client.get("/api/v1/organization-applications", headers=admin_headers)
+            assert applications.status_code == 200
+            applicant_id = organization.json()["id"]
+            assert applicant_id in {item["id"] for item in applications.json()}
+            decision_url = f"/api/v1/organization-applications/{applicant_id}"
+            assert client.patch(decision_url, headers=headers, json={"status": "approved"}).status_code == 403
+            rejected = client.patch(decision_url, headers=admin_headers, json={"status": "rejected"})
+            assert rejected.status_code == 200
+            assert client.get("/api/v1/profile/me", headers=headers).json()["organization_status"] == "rejected"
+            assert client.patch("/api/v1/profile/organization", headers=headers,
+                                json={"organization_name": "Spark Test Organization"}).status_code == 200
+            approved = client.patch(decision_url, headers=admin_headers, json={"status": "approved"})
+            assert approved.status_code == 200
+            assert client.patch(decision_url, headers=admin_headers, json={"status": "approved"}).status_code == 409
 
             created = client.post(
                 "/api/v1/opportunities",
@@ -414,6 +440,7 @@ def test_organization_can_publish_mapped_opportunity() -> None:
             assert created.json()["id"] in {item["id"] for item in listed.json()}
     finally:
         asyncio.run(delete_test_user(email))
+        asyncio.run(delete_test_user(admin_email))
 
 
 def test_user_can_propose_event_and_admin_can_publish_it() -> None:

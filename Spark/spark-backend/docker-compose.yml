@@ -21,7 +21,10 @@ services:
 
   api:
     build: .
+    volumes:
+      - ./app:/app/app:ro
     environment:
+      APP_ENVIRONMENT: development
       DATABASE_URL: postgresql+asyncpg://spark:spark@postgres:5432/spark
       JWT_SECRET: local-development-secret-replace-in-production
       ACCESS_TOKEN_MINUTES: 30

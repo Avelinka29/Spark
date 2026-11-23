@@ -42,7 +42,7 @@ class AvatarRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str = Field(min_length=1, max_length=320)
     password: str
 
 
@@ -176,6 +176,7 @@ class ProfileResponse(BaseModel):
     interests: list[str]
     account_type: str = "user"
     organization_name: str | None = None
+    organization_status: str | None = None
 
 
 class ProfileUpdate(BaseModel):
@@ -188,6 +189,18 @@ class ProfileUpdate(BaseModel):
 
 class OrganizationProfileUpdate(BaseModel):
     organization_name: str = Field(min_length=2, max_length=160)
+
+
+class OrganizationApplicationResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    email: EmailStr
+    organization_name: str
+    organization_status: str
+
+
+class OrganizationDecision(BaseModel):
+    status: Literal["approved", "rejected"]
 
 
 class PublicProfileResponse(BaseModel):

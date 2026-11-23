@@ -9,6 +9,7 @@ final class ProfileStore {
     private(set) var isLoading = false
     private(set) var errorMessage: String?
     private(set) var eventProposals: [EventProposalDTO] = []
+    private(set) var organizationApplications: [OrganizationApplicationDTO] = []
 
     private let token: String?
 
@@ -141,6 +142,29 @@ final class ProfileStore {
         } catch {
             errorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    func loadOrganizationApplications() async {
+        guard let token else { return }
+        do {
+            organizationApplications = try await APIClient.shared.send(path: "organization-applications", token: token)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func decideOrganizationApplication(id: UUID, approve: Bool) async {
+        guard let token else { return }
+        do {
+            let _: OrganizationApplicationDTO = try await APIClient.shared.send(
+                path: "organization-applications/\(id)", method: "PATCH",
+                body: OrganizationDecisionRequest(status: approve ? "approved" : "rejected"), token: token
+            )
+            await loadOrganizationApplications()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

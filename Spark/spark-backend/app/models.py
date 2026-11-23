@@ -44,6 +44,7 @@ class User(Base):
     avatar_content_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     account_type: Mapped[str] = mapped_column(String(24), default="user", index=True)
     organization_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    organization_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 

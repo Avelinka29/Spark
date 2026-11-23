@@ -22,6 +22,7 @@ the social/chat schema (`007_social_and_chat.sql`), apply the following once, in
 ```sh
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/008_organization_accounts.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/009_event_proposals.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/010_organization_approval.sql
 ```
 
 For older databases, inspect the schema and apply the missing numbered SQL files in
@@ -32,9 +33,15 @@ on an existing database without reviewing it.
 Set `ADMIN_EMAILS` to a comma-separated list of administrator email addresses before
 creating their accounts. Existing accounts are not promoted by changing this setting;
 an operator must explicitly update `users.account_type` to `admin` after verifying
-the account. Remove access explicitly if an administrator leaves. Users can currently
-switch themselves to an organization account and publish directly; this is an open
-product policy, not verification of an organization.
+the account. Remove access explicitly if an administrator leaves. Organization
+applications require an administrator decision before publishing. Migration 010
+returns pre-existing organization accounts to pending review.
+
+For local development only, `docker compose exec api python -m app.create_dev_admin`
+creates the administrator with login `admin` and password `admin`. It refuses to
+overwrite an existing account and cannot run outside development. These credentials
+are publicly known and must never be used for a public deployment. Development Compose
+mounts the local `app` directory; restart the API container after Python changes.
 
 ## Production preparation
 

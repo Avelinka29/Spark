@@ -38,6 +38,8 @@ from .schemas import (
     OpportunityCreate,
     OpportunityResponse,
     OrganizationProfileUpdate,
+    OrganizationApplicationResponse,
+    OrganizationDecision,
     ProfileResponse,
     ProfileUpdate,
     PublicProfileResponse,
@@ -147,7 +149,12 @@ async def register(payload: RegisterRequest, session: AsyncSession = Depends(get
 
 @app.post("/api/v1/auth/login", response_model=TokenResponse)
 async def login(payload: LoginRequest, session: AsyncSession = Depends(get_session)) -> TokenResponse:
-    user = await session.scalar(select(User).where(User.email == payload.email.lower()))
+    email = payload.email.strip().lower()
+    if email in {"admin", "admin@spark.example.com"}:
+        if get_settings().app_environment != "development":
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        email = "admin@spark.example.com"
+    user = await session.scalar(select(User).where(User.email == email))
     if user is None or user.password_hash is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.email_verified:
@@ -806,12 +813,54 @@ async def enable_organization_profile(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> User:
-    if user.account_type != "admin":
-        user.account_type = "organization"
-    user.organization_name = payload.organization_name.strip()
+    name = payload.organization_name.strip()
+    if len(name) < 2:
+        raise HTTPException(status_code=422, detail="Organization name is too short")
+    if user.account_type in {"admin", "organization"}:
+        raise HTTPException(status_code=409, detail="Account already has publishing access")
+    if user.organization_status == "pending":
+        raise HTTPException(status_code=409, detail="Organization application is already pending")
+    user.organization_name = name
+    user.organization_status = "pending"
+    admin_ids = list(await session.scalars(select(User.id).where(User.account_type == "admin")))
+    for admin_id in admin_ids:
+        session.add(Notification(user_id=admin_id, title="Заявка организации", message=f"{user.name}: {name}"))
     await session.commit()
     await session.refresh(user)
     return user
+
+
+@app.get("/api/v1/organization-applications", response_model=list[OrganizationApplicationResponse])
+async def list_organization_applications(
+    user: User = Depends(current_user), session: AsyncSession = Depends(get_session)
+) -> list[OrganizationApplicationResponse]:
+    if user.account_type != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    applicants = (await session.scalars(select(User).where(User.organization_status == "pending"))).all()
+    return [OrganizationApplicationResponse.model_validate(applicant, from_attributes=True) for applicant in applicants]
+
+
+@app.patch("/api/v1/organization-applications/{user_id}", response_model=OrganizationApplicationResponse)
+async def decide_organization_application(
+    user_id: uuid.UUID, payload: OrganizationDecision,
+    user: User = Depends(current_user), session: AsyncSession = Depends(get_session)
+) -> OrganizationApplicationResponse:
+    if user.account_type != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    applicant = await session.scalar(select(User).where(User.id == user_id).with_for_update())
+    if applicant is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+    if applicant.organization_status != "pending":
+        raise HTTPException(status_code=409, detail="Application is not pending")
+    applicant.organization_status = payload.status
+    if payload.status == "approved":
+        applicant.account_type = "organization"
+    session.add(Notification(user_id=applicant.id, title="Заявка организации рассмотрена", message=(
+        "Профиль организации подтверждён." if payload.status == "approved" else "Заявка организации отклонена. Вы можете подать её снова."
+    )))
+    await session.commit()
+    await session.refresh(applicant)
+    return OrganizationApplicationResponse.model_validate(applicant, from_attributes=True)
 
 
 async def friendship_between(

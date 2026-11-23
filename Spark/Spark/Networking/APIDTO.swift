@@ -220,11 +220,13 @@ struct ProfileDTO: Decodable {
     let interests: [String]
     let accountType: String
     let organizationName: String?
+    let organizationStatus: String?
 
     enum CodingKeys: String, CodingKey {
         case id, email, name, region, bio, skills, interests
         case accountType = "account_type"
         case organizationName = "organization_name"
+        case organizationStatus = "organization_status"
     }
 
     func makeProfile() -> UserProfile {
@@ -237,7 +239,8 @@ struct ProfileDTO: Decodable {
             interests: interests,
             achievements: [],
             accountType: accountType,
-            organizationName: organizationName
+            organizationName: organizationName,
+            organizationStatus: organizationStatus
         )
     }
 }
@@ -248,6 +251,24 @@ struct OrganizationProfileRequest: Encodable {
     enum CodingKeys: String, CodingKey {
         case organizationName = "organization_name"
     }
+}
+
+struct OrganizationApplicationDTO: Decodable, Identifiable {
+    let id: UUID
+    let name: String
+    let email: String
+    let organizationName: String
+    let organizationStatus: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, email
+        case organizationName = "organization_name"
+        case organizationStatus = "organization_status"
+    }
+}
+
+struct OrganizationDecisionRequest: Encodable {
+    let status: String
 }
 
 struct OpportunityCreateRequest: Codable {
