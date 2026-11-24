@@ -4,6 +4,7 @@ struct ProjectView: View {
     let store: ProjectStore
     let currentUserID: UUID?
     var profile: UserProfile? = nil
+    @State private var showAIConfirmation = false
 
     private var recommendations: [ProjectRecommendation] {
         ProjectRecommendations.matching(projects: store.projects, profile: profile)
@@ -17,6 +18,42 @@ struct ProjectView: View {
                         projectsCount: store.projects.count,
                         rolesCount: store.openRolesCount
                     )
+
+                    if profile != nil {
+                        Button {
+                            showAIConfirmation = true
+                        } label: {
+                            if store.aiIsLoading {
+                                ProgressView()
+                            } else {
+                                Label("Подобрать проекты с ИИ", systemImage: "sparkles")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(store.aiIsLoading)
+                        if let message = store.aiMessage {
+                            Text(message).font(.footnote).foregroundStyle(.secondary)
+                        }
+                        if !store.aiMatches.isEmpty {
+                            Text("Подбор ИИ").font(.title3.bold()).frame(maxWidth: .infinity, alignment: .leading)
+                            Text("ИИ может ошибаться — проверь описание проекта.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            ForEach(store.aiMatches) { match in
+                                if let project = store.projects.first(where: { $0.id == match.id }) {
+                                    NavigationLink {
+                                        ProjectDetailsView(project: project, store: store, isOwner: false)
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text(project.title).font(.headline)
+                                            Text(match.reason).font(.subheadline).foregroundStyle(.secondary)
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding().background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                                    }.buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
 
                     if !recommendations.isEmpty {
                         Text("Подходит тебе")
@@ -89,6 +126,12 @@ struct ProjectView: View {
                 .padding(.bottom, 180)
             }
             .navigationTitle("ProjectHub")
+            .alert("Подбор с ИИ", isPresented: $showAIConfirmation) {
+                Button("Продолжить") { Task { await store.loadAIRecommendations() } }
+                Button("Отмена", role: .cancel) {}
+            } message: {
+                Text("Сервер передаст модели ваши навыки, интересы и описания открытых проектов. Имя и email из профиля отдельно не отправляются, но могут встречаться в текстах. Провайдер зависит от настройки сервера.")
+            }
             .sensoryFeedback(.success, trigger: store.successFeedbackTrigger)
             .task {
                 await store.load()

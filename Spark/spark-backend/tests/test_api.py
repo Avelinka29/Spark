@@ -8,6 +8,7 @@ import httpx
 from sqlalchemy import delete, text
 
 from app.database import SessionFactory, engine
+from app.config import get_settings
 from app.models import User
 
 
@@ -95,6 +96,9 @@ def test_full_user_scenario() -> None:
             profile = client.get("/api/v1/profile/me", headers=headers)
             assert profile.status_code == 200
             assert profile.json()["email"] == email
+            assert client.post("/api/v1/recommendations/projects").status_code == 401
+            if not get_settings().ai_ollama_url or not get_settings().ai_ollama_model:
+                assert client.post("/api/v1/recommendations/projects", headers=headers).status_code == 503
 
             avatar_data = base64.b64encode(b"spark-avatar-test").decode()
             avatar_update = client.put(

@@ -10,6 +10,9 @@ final class ProjectStore {
     private(set) var myApplications: [ProjectApplicationDTO] = []
     private(set) var receivedApplications: [ProjectApplicationDTO] = []
     private(set) var successFeedbackTrigger = 0
+    private(set) var aiMatches: [AIProjectMatchDTO] = []
+    private(set) var aiIsLoading = false
+    private(set) var aiMessage: String?
 
     private let token: String?
 
@@ -23,6 +26,24 @@ final class ProjectStore {
     var openRolesCount: Int {
         projects.reduce(0) { count, project in
             count + project.vacancies.filter(\.isActive).count
+        }
+    }
+
+    func loadAIRecommendations() async {
+        guard let token else { return }
+        aiIsLoading = true
+        aiMessage = nil
+        defer { aiIsLoading = false }
+        do {
+            let matches: [AIProjectMatchDTO] = try await APIClient.shared.send(
+                path: "recommendations/projects", method: "POST", token: token)
+            aiMatches = matches.filter { match in projects.contains { $0.id == match.id } }
+            if aiMatches.isEmpty {
+                aiMessage = "ИИ не нашёл подходящих проектов. Проверь навыки и интересы в профиле."
+            }
+        } catch {
+            aiMatches = []
+            aiMessage = "ИИ сейчас недоступен. Обычный подбор продолжает работать."
         }
     }
 

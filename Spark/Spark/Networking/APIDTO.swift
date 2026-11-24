@@ -97,6 +97,24 @@ struct OpportunityDTO: Decodable {
     func makeOpportunity() -> Opportunity {
         let category = EventCategory(rawValue: category) ?? .other
         let presentation = category.presentation
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.isLenient = false
+        let today = Calendar.current.startOfDay(for: Date())
+        let endDate = (endsAt ?? startsAt).flatMap { formatter.date(from: $0) }
+        let deadlineDate = deadline.flatMap { formatter.date(from: $0) }
+        let status: String?
+        if let endDate, endDate < today {
+            status = "ЗАВЕРШЕНО"
+        } else if let deadlineDate, deadlineDate < today {
+            status = "ПРИЁМ ЗАКРЫТ"
+        } else if endDate != nil || deadlineDate != nil {
+            status = "АКТУАЛЬНО"
+        } else {
+            status = nil
+        }
 
         return Opportunity(
             id: id,
@@ -111,7 +129,7 @@ struct OpportunityDTO: Decodable {
             deadlineText: deadline ?? "Не указан",
             participantCount: nil,
             locationName: locationName,
-            status: "АКТУАЛЬНО",
+            status: status,
             reward: reward,
             organizer: organizer,
             latitude: latitude,
@@ -130,6 +148,11 @@ struct ProjectRoleDTO: Codable {
         case id, title, skills
         case isOpen = "is_open"
     }
+}
+
+struct AIProjectMatchDTO: Decodable, Identifiable {
+    let id: UUID
+    let reason: String
 }
 
 struct ProjectDTO: Codable {

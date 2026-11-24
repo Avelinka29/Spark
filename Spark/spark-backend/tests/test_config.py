@@ -23,3 +23,13 @@ def test_production_accepts_complete_secure_configuration() -> None:
     )
 
     assert settings.app_environment == "production"
+
+
+def test_ai_configuration_must_be_complete() -> None:
+    with pytest.raises(ValidationError):
+        Settings(ai_ollama_url="http://localhost:11434", ai_ollama_model="")
+
+
+def test_ai_url_rejects_embedded_credentials() -> None:
+    with pytest.raises(ValidationError):
+        Settings(ai_ollama_url="https://user:secret@example.com", ai_ollama_model="model")

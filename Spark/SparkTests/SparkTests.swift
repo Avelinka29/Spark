@@ -96,6 +96,17 @@ struct APIDTOTests {
     }
 }
 
+struct OpportunityStatusTests {
+    @Test
+    func pastEventsAreNotMarkedActive() throws {
+        let json = #"""
+        {"id":"2A835521-238B-4BBE-AB8B-06F4D9DF01A1","category":"Мероприятия","title":"Встреча","summary":"Описание","details":"Описание","organizer":"Spark","image_url":null,"location_name":"Минск","latitude":null,"longitude":null,"starts_at":"2020-01-01","ends_at":null,"deadline":"2019-12-31","reward":null}
+        """#
+        let dto = try JSONDecoder().decode(OpportunityDTO.self, from: Data(json.utf8))
+        #expect(dto.makeOpportunity().status == "ЗАВЕРШЕНО")
+    }
+}
+
 struct KeychainStoreTests {
     @Test
     func `Token can be saved read and deleted`() throws {

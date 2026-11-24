@@ -1,7 +1,9 @@
 import hashlib
+import asyncio
 import base64
 import secrets
 import uuid
+import httpx
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
@@ -15,6 +17,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from starlette.concurrency import run_in_threadpool
 
 from .config import get_settings
+from .ai_recommendations import ModelMatch, rank_projects
 from .database import get_session
 from .email_service import send_auth_code
 from .models import Achievement, Application, ApplicationStatus, AuthCode, AuthCodePurpose, Bookmark, ChatMember, ChatMessage, EventProposal, Friendship, FriendshipStatus, Notification, Opportunity, OpportunityAttendance, Project, ProjectChat, ProjectRole, TeamTask, TeamWorkspace, User
@@ -67,6 +70,7 @@ from .security import create_access_token, current_user, hash_password, verify_p
 
 
 app = FastAPI(title="Spark Backend API", version="0.1.0")
+ai_request_slot = asyncio.Semaphore(1)
 
 
 @app.get("/health")
@@ -559,6 +563,35 @@ async def remove_bookmark(
 async def list_projects(session: AsyncSession = Depends(get_session)) -> list[Project]:
     query = select(Project).options(selectinload(Project.roles)).order_by(Project.created_at.desc())
     return list((await session.scalars(query)).unique().all())
+
+
+@app.post("/api/v1/recommendations/projects", response_model=list[ModelMatch])
+async def recommend_projects(user: User = Depends(current_user),
+                             session: AsyncSession = Depends(get_session)) -> list[ModelMatch]:
+    settings = get_settings()
+    if not settings.ai_ollama_url or not settings.ai_ollama_model:
+        raise HTTPException(status_code=503, detail="AI recommendations are not configured")
+    if not user.skills and not user.interests:
+        return []
+    query = (select(Project).options(selectinload(Project.roles))
+             .where(Project.owner_id != user.id, Project.roles.any(ProjectRole.is_open.is_(True)))
+             .order_by(Project.created_at.desc()).limit(12))
+    projects = list((await session.scalars(query)).unique().all())
+    candidates = [{"id": str(project.id), "title": project.title[:120], "category": project.category[:80],
+                   "summary": project.summary[:220],
+                   "roles": [{"title": role.title[:80], "skills": role.skills[:120]}
+                             for role in project.roles if role.is_open][:5]}
+                  for project in projects]
+    try:
+        await asyncio.wait_for(ai_request_slot.acquire(), timeout=1)
+        try:
+            return await rank_projects(settings.ai_ollama_url, settings.ai_ollama_model,
+                                       [value[:120] for value in user.skills],
+                                       [value[:120] for value in user.interests], candidates)
+        finally:
+            ai_request_slot.release()
+    except (httpx.HTTPError, ValueError, TimeoutError) as error:
+        raise HTTPException(status_code=503, detail="AI recommendations temporarily unavailable") from error
 
 
 @app.post("/api/v1/projects", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)

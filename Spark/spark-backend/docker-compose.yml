@@ -36,6 +36,8 @@ services:
       SMTP_SENDER: ${SMTP_SENDER:-}
       ALLOW_DEVELOPMENT_CODES: ${ALLOW_DEVELOPMENT_CODES:-true}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-avelinka453@gmail.com}
+      AI_OLLAMA_URL: ${AI_OLLAMA_URL:-}
+      AI_OLLAMA_MODEL: ${AI_OLLAMA_MODEL:-}
     ports:
       - "8000:8000"
     depends_on:

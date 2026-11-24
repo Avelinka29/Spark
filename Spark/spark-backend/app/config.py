@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,6 +19,8 @@ class Settings(BaseSettings):
     smtp_sender: str = ""
     allow_development_codes: bool = False
     admin_emails: str = ""
+    ai_ollama_url: str = ""
+    ai_ollama_model: str = ""
 
     def is_admin_email(self, email: str) -> bool:
         allowed = {item.strip().lower() for item in self.admin_emails.split(",") if item.strip()}
@@ -27,6 +30,14 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
+        if bool(self.ai_ollama_url) != bool(self.ai_ollama_model):
+            raise ValueError("Set both AI_OLLAMA_URL and AI_OLLAMA_MODEL, or leave both empty")
+        if self.ai_ollama_url:
+            parsed = urlsplit(self.ai_ollama_url)
+            if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+                raise ValueError("AI_OLLAMA_URL must be an HTTP(S) URL without credentials or query parameters")
+            if self.app_environment == "production" and parsed.scheme != "https":
+                raise ValueError("AI_OLLAMA_URL must use HTTPS in production")
         if self.app_environment != "production":
             return self
 

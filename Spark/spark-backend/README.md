@@ -58,6 +58,32 @@ removes its self-reported event entry. Chat members can manage shared tasks, lin
 meeting notes; progress is the fraction of completed tasks. The shared text fields use
 last-write-wins, so concurrent edits may overwrite each other.
 
+### Optional AI project recommendations
+
+The ProjectHub AI button is opt-in. The backend can call a self-hosted Ollama
+`/api/chat` endpoint with structured JSON output. It sends the user's skills and
+interests and at most 12 open project descriptions, but not the user's name or email.
+These fields and project descriptions may still contain personal information. It
+does not send data until the user confirms the action in the app. Model output is
+untrusted: the API accepts only candidate project IDs and the app warns that model
+explanations may be wrong. Exact-match recommendations continue to work if AI is off.
+
+To try locally, install and run Ollama separately and choose a multilingual model
+appropriate for the machine, for example `ollama pull qwen2.5:1.5b`. This downloads
+model data; quality and performance must be evaluated. Set both variables in the
+Compose `.env` file and recreate the API container:
+
+```dotenv
+AI_OLLAMA_URL=http://host.docker.internal:11434
+AI_OLLAMA_MODEL=qwen2.5:1.5b
+```
+
+`docker compose up -d --no-deps api` applies the settings. An absent model or service
+returns an unavailable response; it never silently falls back to another provider.
+Ollama should remain private. Production requires an HTTPS endpoint and appropriate
+access controls; do not expose an unauthenticated model server to the public Internet.
+The current adapter targets local Ollama structured output, not a generic cloud API.
+
 ## Production preparation
 
 `docker-compose.production.yml` is a hardened starting point for a single server. It does not expose PostgreSQL publicly and refuses to start without the required secrets, Google client ID and SMTP credentials.
