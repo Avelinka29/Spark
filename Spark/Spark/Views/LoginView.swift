@@ -48,6 +48,7 @@ struct LoginView: View {
             Spacer()
             
             
+            ScrollView {
             VStack(alignment: .leading, spacing: 18){
                 
                 HStack{
@@ -430,6 +431,7 @@ struct LoginView: View {
                 
             } .padding(.horizontal, 28)
                 .frame(maxWidth: .infinity,alignment: .leading)
+            }
             
         }
         .fullScreenCover(isPresented: $showHome) {
