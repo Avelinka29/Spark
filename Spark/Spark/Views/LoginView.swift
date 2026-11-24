@@ -22,6 +22,10 @@ struct LoginView: View {
     @State private var showPasswordReset = false
     @State private var registrationError: String?
     @State private var authStore = AuthStore()
+    @State private var checkingSavedSession = true
+    @State private var showSavedSessionUnlock = false
+    @State private var isUnlocking = false
+    @State private var skipSavedSession = false
     
     var body: some View {
         
@@ -455,6 +459,63 @@ struct LoginView: View {
             }
             
         }
+        .overlay {
+            if checkingSavedSession {
+                ZStack {
+                    Color(.systemBackground).ignoresSafeArea()
+                    VStack(spacing: 20) {
+                        ProgressView("Проверяем сохранённый вход…")
+                        Button("Войти в другой аккаунт") {
+                            skipSavedSession = true
+                            authStore.logout()
+                            checkingSavedSession = false
+                        }
+                    }
+                }
+            } else if showSavedSessionUnlock {
+                ZStack {
+                    Color(.systemBackground).ignoresSafeArea()
+                    VStack(spacing: 20) {
+                        Image(systemName: "lock.shield")
+                            .font(.system(size: 56))
+                            .foregroundStyle(.primaryLitePurple)
+                        Text("С возвращением!")
+                            .font(.title.bold())
+                        Text("На этом устройстве сохранён вход в Spark. Разблокируйте его или войдите в другой аккаунт.")
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.secondary)
+                        if let error = authStore.errorMessage {
+                            Text(error).font(.footnote).foregroundStyle(.red)
+                                .multilineTextAlignment(.center)
+                        }
+                        Button {
+                            Task {
+                                isUnlocking = true
+                                if await authStore.unlockWithBiometrics() {
+                                    showHome = true
+                                    showSavedSessionUnlock = false
+                                }
+                                isUnlocking = false
+                            }
+                        } label: {
+                            if isUnlocking {
+                                ProgressView()
+                            } else {
+                                Label("Разблокировать вход", systemImage: "faceid")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isUnlocking)
+                        Button("Войти в другой аккаунт") {
+                            authStore.logout()
+                            showSavedSessionUnlock = false
+                        }
+                        .disabled(isUnlocking)
+                    }
+                    .padding(32)
+                }
+            }
+        }
         .fullScreenCover(isPresented: $showHome) {
             MainTabView(
                 accessToken: authStore.accessToken,
@@ -533,13 +594,16 @@ struct LoginView: View {
             authStore.clearError()
         }
         .task {
+            defer { checkingSavedSession = false }
             authStore.clearError()
-            guard await authStore.validateSavedSession() else {
+            let sessionIsValid = await authStore.validateSavedSession()
+            guard !skipSavedSession else { return }
+            guard sessionIsValid else {
                 showHome = false
                 return
             }
             if authStore.isBiometricEnabled {
-                showHome = await authStore.unlockWithBiometrics()
+                showSavedSessionUnlock = true
             } else {
                 showHome = true
             }
