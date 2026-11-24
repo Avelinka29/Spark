@@ -19,7 +19,7 @@ struct OportunityMarker: View {
                 Image(systemName: "mappin")
                     .foregroundStyle(Color.primaryRed)
                 
-                Text("\(count) возможностей рядом" )
+                Text("На карте: \(count)" )
                     .foregroundStyle(Color.primaryWhite)
             } .frame(maxWidth: .infinity)
                 .padding(.horizontal, 10)
@@ -36,7 +36,7 @@ struct OportunityMarker: View {
                 Image(systemName: "mappin")
                     .foregroundStyle(Color.primaryRed)
                 
-                Text("\(count) возможность рядом" )
+                Text("На карте: \(count)" )
                     .foregroundStyle(Color.primaryWhite)
             } .frame(maxWidth: .infinity)
                 .padding(.horizontal, 10)
@@ -51,7 +51,7 @@ struct OportunityMarker: View {
                 Image(systemName: "mappin")
                     .foregroundStyle(Color.primaryRed)
                 
-                Text("\(count) возможности рядом" )
+                Text("На карте: \(count)" )
                     .foregroundStyle(Color.primaryWhite)
             } .frame(maxWidth: .infinity)
                 .padding(.horizontal, 10)
@@ -66,7 +66,7 @@ struct OportunityMarker: View {
                 Image(systemName: "mappin")
                     .foregroundStyle(Color.primaryRed)
                 
-                Text("\(count) возможностей рядом" )
+                Text("На карте: \(count)" )
                     .foregroundStyle(Color.primaryWhite)
             } .frame(maxWidth: .infinity)
                 .padding(.horizontal, 10)
@@ -81,7 +81,7 @@ struct OportunityMarker: View {
                 Image(systemName: "mappin")
                     .foregroundStyle(Color.primaryRed)
                 
-                Text("\(count) возможностей рядом" )
+                Text("На карте: \(count)" )
                     .foregroundStyle(Color.primaryWhite)
             } 
                 .padding(.horizontal, 10)

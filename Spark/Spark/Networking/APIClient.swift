@@ -124,6 +124,10 @@ actor APIClient {
             return "Неверный email или пароль."
         case "Email already registered", "Email is already registered":
             return "Пользователь с таким email уже зарегистрирован. Попробуйте войти и подтвердить email."
+        case "Email or username is already registered", "Username already registered":
+            return "Этот email или ник уже занят. Проверьте данные или выберите другой ник."
+        case "Username not found":
+            return "Пользователь с таким ником не найден."
         case "Invalid Google token":
             return "Google не подтвердил вход. Попробуйте ещё раз."
         case "Google email is not verified":

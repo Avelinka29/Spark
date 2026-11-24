@@ -84,6 +84,9 @@ private struct ProfileContent: View {
     @State private var showEventProposal = false
     @State private var showAdminProposals = false
     @State private var showOrganizationApplications = false
+    @State private var showUsernameEditor = false
+    @State private var username = ""
+    @State private var usernameError: String?
 
     var body: some View {
         ScrollView {
@@ -102,6 +105,13 @@ private struct ProfileContent: View {
                 )
 
                 if canEditAvatar {
+                    Button {
+                        username = profile.username ?? ""
+                        showUsernameEditor = true
+                    } label: {
+                        Label(profile.username.map { "@\($0)" } ?? "Добавить ник для поиска", systemImage: "at")
+                    }
+                    .font(.subheadline.weight(.medium))
                     Button {
                         showProfileEditor = true
                     } label: {
@@ -125,6 +135,38 @@ private struct ProfileContent: View {
 
                 ProfileTagsSection(title: "Навыки", tags: profile.skills)
                 ProfileTagsSection(title: "Интересы", tags: profile.interests)
+                if canEditAvatar {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Моё портфолио", systemImage: "sparkles")
+                            .font(.title3.bold())
+                        if let error = store.portfolioError {
+                            Text(error).font(.footnote).foregroundStyle(.secondary)
+                        } else if let portfolio = store.portfolio {
+                            if portfolio.events.isEmpty && portfolio.projects.isEmpty {
+                                Text("Здесь появятся ваши проекты и посещённые события.")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            ForEach(portfolio.events) { event in
+                                Label(event.title, systemImage: "calendar.badge.checkmark")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            ForEach(portfolio.projects) { project in
+                                Label("\(project.title) · \(project.role)", systemImage: "person.3")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            if !portfolio.events.isEmpty {
+                                Text("Участие отмечено вами и пока не подтверждено организатором.")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
+                        } else {
+                            ProgressView()
+                        }
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 22))
+                    .padding(.horizontal, 24)
+                }
                 AchievementSection(
                     achievements: profile.achievements,
                     canEdit: canEditAvatar,
@@ -134,7 +176,25 @@ private struct ProfileContent: View {
             }
             .padding(.bottom, 32)
         }
+        .background(Color(.systemGroupedBackground))
         .refreshable { await store.load() }
+        .alert("Ник для поиска", isPresented: $showUsernameEditor) {
+            TextField("Ник латиницей", text: $username)
+                .textInputAutocapitalization(.never).autocorrectionDisabled()
+            Button("Сохранить") {
+                Task {
+                    if !(await store.setUsername(username)) {
+                        usernameError = store.errorMessage
+                    }
+                }
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("От 3 до 32 латинских букв, цифр или символов подчёркивания.")
+        }
+        .alert("Не удалось сохранить ник", isPresented: Binding(get: { usernameError != nil }, set: { if !$0 { usernameError = nil } })) {
+            Button("Понятно", role: .cancel) {}
+        } message: { Text(usernameError ?? "") }
         .sheet(isPresented: $showSettings) {
             ProfileSettingsView(
                 isBiometricEnabled: isBiometricEnabled,

@@ -11,11 +11,30 @@ struct SocialView: View {
     @State private var showManualEntry = false
     @State private var profileLink = ""
     @State private var selectedProfile: ScannedProfile?
+    @State private var showUsernameSearch = false
+    @State private var usernameSearch = ""
+    @State private var searchError: String?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Вместе интереснее")
+                            .font(.title2.bold())
+                        Text("Находите друзей и развивайте проекты вместе")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Button {
+                        showUsernameSearch = true
+                    } label: {
+                        Label("Найти друга по нику", systemImage: "magnifyingglass")
+                            .frame(maxWidth: .infinity)
+                            .padding(14)
+                            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    }
                     if let currentUserID {
                         ProfileShareCard(
                             profileID: currentUserID,
@@ -51,6 +70,7 @@ struct SocialView: View {
                 }
                 .padding()
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Сообщество")
             .overlay {
                 if store.isLoading && store.friends.isEmpty && store.chats.isEmpty {
@@ -89,6 +109,22 @@ struct SocialView: View {
             } message: {
                 Text("Вставьте ссылку Spark или идентификатор профиля.")
             }
+            .alert("Найти друга", isPresented: $showUsernameSearch) {
+                TextField("Ник", text: $usernameSearch).textInputAutocapitalization(.never).autocorrectionDisabled()
+                Button("Найти") {
+                    Task {
+                        if let id = await store.findUsername(usernameSearch) {
+                            selectedProfile = ScannedProfile(id: id)
+                        } else {
+                            searchError = store.errorMessage ?? "Не удалось выполнить поиск."
+                        }
+                    }
+                }
+                Button("Отмена", role: .cancel) {}
+            } message: { Text("Введите точный ник пользователя.") }
+            .alert("Поиск", isPresented: Binding(get: { searchError != nil }, set: { if !$0 { searchError = nil } })) {
+                Button("Понятно", role: .cancel) {}
+            } message: { Text(searchError ?? "") }
             .onChange(of: store.pendingProfileID) { _, profileID in
                 guard let profileID else { return }
                 selectedProfile = ScannedProfile(id: profileID)
@@ -235,6 +271,8 @@ private struct FriendsSection: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .padding(14)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 18))
                     .contextMenu {
                         Button("Удалить из друзей", role: .destructive) {
                             onRemove(friend)
@@ -285,7 +323,8 @@ private struct ChatsSection: View {
                             Image(systemName: "chevron.right")
                                 .foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 6)
+                        .padding(14)
+                        .background(.background, in: RoundedRectangle(cornerRadius: 18))
                     }
                 }
             }
@@ -312,6 +351,9 @@ private struct PublicProfileView: View {
 
                         Text(profile.name)
                             .font(.title.bold())
+                        if let username = profile.username {
+                            Text("@\(username)").foregroundStyle(.secondary)
+                        }
                         if !profile.region.isEmpty {
                             Label(profile.region, systemImage: "mappin")
                                 .foregroundStyle(.secondary)

@@ -11,6 +11,12 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     name: str = Field(min_length=2, max_length=120)
+    username: str | None = Field(default=None, pattern=r"^[a-z0-9_]{3,32}$")
+    organization_name: str | None = Field(default=None, min_length=2, max_length=160)
+
+
+class UsernameUpdate(BaseModel):
+    username: str = Field(pattern=r"^[a-z0-9_]{3,32}$")
 
 
 class EmailRequest(BaseModel):
@@ -170,6 +176,7 @@ class ProfileResponse(BaseModel):
     id: uuid.UUID
     email: EmailStr
     name: str
+    username: str | None = None
     region: str
     bio: str
     skills: list[str]
@@ -250,6 +257,7 @@ class PortfolioEvent(BaseModel):
 class PublicProfileResponse(BaseModel):
     id: uuid.UUID
     name: str
+    username: str | None = None
     region: str
     bio: str
     skills: list[str]

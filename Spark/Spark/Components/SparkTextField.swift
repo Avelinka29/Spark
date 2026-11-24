@@ -69,10 +69,13 @@ struct SparkTextField: View {
                         text: $text,
                         prompt: Text(placeholder).foregroundStyle(.primaryGrey1)
                     )
+                    .keyboardType(placeholder == "Email" ? .emailAddress : .default)
+                    .textInputAutocapitalization(placeholder == "Email" || placeholder.hasPrefix("Ник") ? .never : .sentences)
+                    .autocorrectionDisabled(placeholder == "Email" || placeholder.hasPrefix("Ник"))
                 
                 
             }}
-        .padding()
+        .padding(.horizontal, 16)
         .frame(height: height)
         .frame(maxWidth: .infinity)
         .background(RoundedRectangle(cornerRadius: cornerRadius).fill(backgroundColor.color))

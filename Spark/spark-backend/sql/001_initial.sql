@@ -9,6 +9,7 @@ CREATE TABLE users (
     google_sub VARCHAR(255) UNIQUE,
     email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     name VARCHAR(120) NOT NULL,
+    username VARCHAR(32) UNIQUE,
     region VARCHAR(120) NOT NULL DEFAULT '',
     bio TEXT NOT NULL DEFAULT '',
     skills VARCHAR[] NOT NULL DEFAULT '{}',

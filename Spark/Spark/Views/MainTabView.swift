@@ -133,6 +133,11 @@ struct MainTabView: View {
                 .animation(.spring(), value: selectedTab)
             }
         }
+        .onChange(of: selectedTab) { _, tab in
+            if tab == 4 {
+                Task { await profileStore.load() }
+            }
+        }
         .navigationBarBackButtonHidden(true)
         .task {
             async let profileLoad: Void = profileStore.load()

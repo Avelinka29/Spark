@@ -8,6 +8,8 @@ final class ProfileStore {
     private(set) var avatarImage: UIImage?
     private(set) var isLoading = false
     private(set) var errorMessage: String?
+    private(set) var portfolio: PublicProfileDTO?
+    private(set) var portfolioError: String?
     private(set) var eventProposals: [EventProposalDTO] = []
     private(set) var organizationApplications: [OrganizationApplicationDTO] = []
 
@@ -44,6 +46,12 @@ final class ProfileStore {
                 $0.makeAchievement()
             }
             profile = loadedProfile
+            do {
+                portfolio = try await APIClient.shared.send(path: "profiles/\(loadedProfile.id)", token: token)
+                portfolioError = nil
+            } catch {
+                portfolioError = "Не удалось загрузить портфолио. Потяните экран вниз, чтобы повторить."
+            }
             avatarImage = await loadRemoteAvatar(token: token)
                 ?? loadAvatar(userID: loadedProfile.id)
         } catch {
@@ -67,6 +75,23 @@ final class ProfileStore {
                 body: payload,
                 token: token
             )
+            await load()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func setUsername(_ value: String) async -> Bool {
+        guard let token else { return false }
+        let username = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard username.range(of: "^[a-z0-9_]{3,32}$", options: .regularExpression) != nil else {
+            errorMessage = "Ник: 3–32 латинские буквы, цифры или подчёркивание."
+            return false
+        }
+        do {
+            let _: ProfileDTO = try await APIClient.shared.send(path: "profile/username", method: "PUT", body: UsernameRequest(username: username), token: token)
             await load()
             return true
         } catch {

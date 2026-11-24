@@ -57,7 +57,7 @@ final class AuthStore {
         )
     }
 
-    func register(name: String, email: String, password: String) async -> Bool {
+    func register(name: String, username: String, email: String, password: String, organizationName: String?) async -> Bool {
         let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
@@ -67,6 +67,16 @@ final class AuthStore {
         }
         guard password.count >= 8 else {
             errorMessage = "Пароль должен содержать не менее 8 символов."
+            return false
+        }
+        let normalizedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard normalizedUsername.range(of: "^[a-z0-9_]{3,32}$", options: .regularExpression) != nil else {
+            errorMessage = "Ник: 3–32 латинские буквы, цифры или подчёркивание."
+            return false
+        }
+        let organization = organizationName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let organization, organization.count < 2 {
+            errorMessage = "Введите название организации."
             return false
         }
 
@@ -81,7 +91,9 @@ final class AuthStore {
                 body: RegisterRequest(
                 email: normalizedEmail,
                 password: password,
-                name: normalizedName
+                name: normalizedName,
+                username: normalizedUsername,
+                organizationName: organization
             )
             )
             developmentCode = response.developmentCode

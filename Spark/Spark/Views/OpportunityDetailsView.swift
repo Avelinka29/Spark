@@ -77,20 +77,20 @@ struct OpportunityDetailsView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.primaryLitePurple)
-                    .disabled(attendanceLoading)
+                    .disabled(attendanceLoading || hasAttended)
                 }
                 .padding(.horizontal)
                 if isGoing {
                     Text("Это отметка для друзей, а не регистрация у организатора.")
                         .font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
                 }
-                if isGoing && hasEventStarted {
+                if isGoing {
                     Button(hasAttended ? "Участие добавлено в портфолио" : "Я участвовал(а)") {
                         Task { await markAttended() }
                     }
-                    .disabled(hasAttended || attendanceLoading)
+                    .disabled(hasAttended || attendanceLoading || !hasEventStarted)
                     .padding(.horizontal)
-                    Text("Участие появится в вашем профиле для пользователей Spark. Организатор его не подтверждал.")
+                    Text(hasEventStarted ? "Участие появится в вашем профиле для пользователей Spark. Организатор его не подтверждал." : "Отметить участие можно с даты начала события.")
                         .font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
                 }
                 if !attendingFriends.isEmpty {

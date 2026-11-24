@@ -11,6 +11,9 @@ struct LoginView: View {
     
     @State private var selectedTab = 0
     @State private var userName: String = ""
+    @State private var userNickname = ""
+    @State private var isOrganization = false
+    @State private var organizationName = ""
     @State private var userEmail: String = ""
     @State private var userPassword: String = ""
     @State private var showHome = false
@@ -324,6 +327,11 @@ struct LoginView: View {
                             }
                             .padding(.top)
                         } else {
+                            Picker("Тип аккаунта", selection: $isOrganization) {
+                                Text("Участник").tag(false)
+                                Text("Организация").tag(true)
+                            }
+                            .pickerStyle(.segmented)
                             
                             SparkTextField(icon: "person",
                                            iconColor: .grey,
@@ -333,6 +341,14 @@ struct LoginView: View {
                                            backgroundColor: .surface,
                                            isSecure: false,
                                            text: $userName).padding(.bottom, 5)
+                            SparkTextField(icon: "at", placeholder: "Ник (латиница)", text: $userNickname)
+                                .padding(.bottom, 5)
+                            if isOrganization {
+                                SparkTextField(icon: "building.2", placeholder: "Название организации", text: $organizationName)
+                                    .padding(.bottom, 5)
+                                Text("После подтверждения почты заявку проверит администратор.")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
                             
                             SparkTextField(icon: "envelope",
                                            iconColor: .grey,
@@ -362,8 +378,10 @@ struct LoginView: View {
                                 Task {
                                     let succeeded = await authStore.register(
                                         name: userName,
+                                        username: userNickname,
                                         email: userEmail,
-                                        password: userPassword
+                                        password: userPassword,
+                                        organizationName: isOrganization ? organizationName : nil
                                     )
                                     if succeeded {
                                         showEmailVerification = true
@@ -523,7 +541,7 @@ private struct EmailVerificationSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Мы отправили шестизначный код на \(email).")
+                    Text(store.developmentCode == nil ? "Мы отправили шестизначный код на \(email)." : "Для локальной проверки используйте код ниже.")
                     TextField("Код подтверждения", text: $code)
                         .keyboardType(.numberPad)
                         .textContentType(.oneTimeCode)

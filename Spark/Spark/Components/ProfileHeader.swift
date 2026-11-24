@@ -27,7 +27,7 @@ struct ProfileHeader: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                .ignoresSafeArea(edges: .top)
+                .clipShape(RoundedRectangle(cornerRadius: 28))
                 
                 Circle()
                     .fill(.primaryYellow)
@@ -62,7 +62,8 @@ struct ProfileHeader: View {
 
                     
                 }
-                .padding(.top, 50)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .padding(.top, 18)
                 .padding(.horizontal, 20)
                 
                 
@@ -74,7 +75,8 @@ struct ProfileHeader: View {
                 onImageSelected: onAvatarSelected
             )
    
-        }.frame(height: 150)
+        }.frame(height: 170)
+            .padding(.horizontal, 16)
     }
 }
 

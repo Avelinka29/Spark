@@ -3,6 +3,12 @@ import MapKit
 import Observation
 import SwiftUI
 
+struct MapOpportunityGroup: Identifiable {
+    let id: String
+    let coordinate: CLLocationCoordinate2D
+    let opportunities: [Opportunity]
+}
+
 @MainActor
 @Observable
 final class MapViewModel: NSObject, @preconcurrency CLLocationManagerDelegate {
@@ -23,6 +29,8 @@ final class MapViewModel: NSObject, @preconcurrency CLLocationManagerDelegate {
     private(set) var visibleOpportunities: [Opportunity]
     private(set) var isLoading = false
     private(set) var errorMessage: String?
+    private(set) var locationDenied = false
+    private var visibleMapRect: MKMapRect?
 
     @ObservationIgnored
     private let locationManager = CLLocationManager()
@@ -35,7 +43,6 @@ final class MapViewModel: NSObject, @preconcurrency CLLocationManagerDelegate {
         super.init()
 
         locationManager.delegate = self
-        checkLocationAvailability()
     }
 
     func load() async {
@@ -60,7 +67,29 @@ final class MapViewModel: NSObject, @preconcurrency CLLocationManagerDelegate {
     }
 
     var opportunitiesCount: Int {
-        visibleOpportunities.count
+        guard let visibleMapRect else { return 0 }
+        return visibleOpportunities.filter { opportunity in
+            guard let coordinate = opportunity.coordinate else { return false }
+            return visibleMapRect.contains(MKMapPoint(coordinate))
+        }.count
+    }
+
+    var pinGroups: [MapOpportunityGroup] {
+        let groups = Dictionary(grouping: visibleOpportunities) { opportunity in
+            "\(opportunity.latitude ?? 0),\(opportunity.longitude ?? 0)"
+        }
+        return groups.compactMap { key, opportunities in
+            guard let coordinate = opportunities.first?.coordinate else { return nil }
+            return MapOpportunityGroup(id: key, coordinate: coordinate, opportunities: opportunities)
+        }.sorted { $0.id < $1.id }
+    }
+
+    func updateVisibleMapRect(_ rect: MKMapRect) {
+        visibleMapRect = rect
+    }
+
+    func requestLocation() {
+        checkLocationAvailability()
     }
 
     func select(_ opportunity: Opportunity) {
@@ -107,7 +136,10 @@ final class MapViewModel: NSObject, @preconcurrency CLLocationManagerDelegate {
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        checkLocationAuthorization()
+        locationDenied = manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted
+        if manager.authorizationStatus == .authorizedWhenInUse || manager.authorizationStatus == .authorizedAlways {
+            manager.requestLocation()
+        }
     }
 
     func locationManager(
@@ -160,7 +192,7 @@ final class MapViewModel: NSObject, @preconcurrency CLLocationManagerDelegate {
         case .notDetermined:
             locationManager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse, .authorizedAlways:
-            locationManager.startUpdatingLocation()
+            locationManager.requestLocation()
         case .restricted, .denied:
             break
         @unknown default:

@@ -33,12 +33,33 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/010_organization_approval.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/011_opportunity_attendance.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/012_team_workspace.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/013_usernames.sql
 ```
 
 For older databases, inspect the schema and apply the missing numbered SQL files in
 order first. These scripts are not an automatic migration system. Fresh databases
 already receive the current schema from `001_initial.sql`; do not rerun seed data
 on an existing database without reviewing it.
+
+For the current local database, apply `sql/013_usernames.sql` before restarting the
+updated API. Existing users can choose a username in their profile. Friend search
+uses an exact username; only verified profiles are returned.
+
+To add five clearly labelled sample projects for AI matching in development, run
+`docker compose exec api python -m app.seed_demo_projects`. The command is
+idempotent and refuses to run outside development. For example, add `Swift`,
+`SwiftUI`, and `Figma` to profile skills and `EdTech`, `FinTech` to interests.
+Demo teams and projects are test data and are not real organizations.
+
+### Email codes in local development
+
+The running API needs its own SMTP settings; a Google Sign-In client ID does not
+configure email delivery. Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+`SMTP_PASSWORD`, and `SMTP_SENDER` in the backend `.env`, set
+`ALLOW_DEVELOPMENT_CODES=false`, and recreate the API with
+`docker compose up -d --no-deps api`. For Gmail on port 587, use a Google app
+password for an account with two-step verification. Never commit credentials.
+Without SMTP, local development may instead display the test code in the app.
 
 Set `ADMIN_EMAILS` to a comma-separated list of administrator email addresses before
 creating their accounts. Existing accounts are not promoted by changing this setting;

@@ -70,6 +70,23 @@ final class SocialStore {
         }
     }
 
+    func findUsername(_ value: String) async -> UUID? {
+        guard let token else { return nil }
+        let username = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+        guard username.range(of: "^[a-z0-9_]{3,32}$", options: .regularExpression) != nil else {
+            errorMessage = "Введите ник латиницей."
+            return nil
+        }
+        do {
+            let result: UsernameLookup = try await APIClient.shared.send(path: "profiles/by-username/\(username)", token: token)
+            errorMessage = nil
+            return result.id
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
     func requestFriend(profileID: UUID) async -> Bool {
         guard let token else { return false }
         do {

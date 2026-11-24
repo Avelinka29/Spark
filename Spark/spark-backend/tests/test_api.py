@@ -15,6 +15,36 @@ from app.models import User
 BASE_URL = os.getenv("TEST_BASE_URL", "http://api:8000")
 
 
+def test_username_registration_and_lookup() -> None:
+    suffix = uuid.uuid4().hex[:12]
+    email = f"username-{suffix}@example.com"
+    second_email = f"duplicate-{suffix}@example.com"
+    username = f"test_{suffix}"
+    try:
+        with httpx.Client(base_url=BASE_URL, timeout=10) as client:
+            response = client.post("/api/v1/auth/register", json={
+                "email": email, "password": "spark-test-password", "name": "Test User", "username": username,
+            })
+            assert response.status_code == 201
+            assert client.post("/api/v1/auth/verify-email", json={
+                "email": email, "code": response.json()["development_code"],
+            }).status_code == 200
+            login = client.post("/api/v1/auth/login", json={"email": email, "password": "spark-test-password"})
+            headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+            profile = client.get("/api/v1/profile/me", headers=headers)
+            assert profile.json()["username"] == username
+            lookup = client.get(f"/api/v1/profiles/by-username/{username}", headers=headers)
+            assert lookup.status_code == 200
+            assert lookup.json()["id"] == profile.json()["id"]
+            duplicate = client.post("/api/v1/auth/register", json={
+                "email": second_email, "password": "spark-test-password", "name": "Test User", "username": username,
+            })
+            assert duplicate.status_code == 409
+    finally:
+        asyncio.run(delete_test_user(email))
+        asyncio.run(delete_test_user(second_email))
+
+
 def create_verified_user(client: httpx.Client, email: str, name: str) -> dict[str, str]:
     password = "spark-social-password"
     registration = client.post(

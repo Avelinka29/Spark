@@ -49,4 +49,17 @@ final class SparkUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Проекты"].exists)
         XCTAssertTrue(app.buttons["Профиль"].exists)
     }
+
+    @MainActor
+    func testMapSearchIsAccessible() throws {
+        let app = XCUIApplication()
+        app.launch()
+        app.buttons["Пропустить и посмотреть приложение"].tap()
+        let mapTab = app.buttons["Карта"]
+        XCTAssertTrue(mapTab.waitForExistence(timeout: 5))
+        mapTab.tap()
+        let search = app.textFields["Поиск возможностей"]
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        XCTAssertTrue(search.isHittable)
+    }
 }

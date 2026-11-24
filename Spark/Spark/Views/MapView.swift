@@ -7,6 +7,7 @@ struct MapView: View {
 
     @State private var model = MapViewModel()
     @State private var presentedOpportunity: Opportunity?
+    @State private var selectedGroup: MapOpportunityGroup?
 
     var body: some View {
         @Bindable var model = model
@@ -15,23 +16,40 @@ struct MapView: View {
             Map(position: $model.cameraPosition) {
                 UserAnnotation()
 
-                ForEach(model.visibleOpportunities) { opportunity in
-                    if let coordinate = opportunity.coordinate {
-                        Annotation(opportunity.title, coordinate: coordinate) {
+                ForEach(model.pinGroups) { group in
+                    if let opportunity = group.opportunities.first {
+                        Annotation(opportunity.title, coordinate: group.coordinate) {
                             OpportunityPin(color: opportunity.mapColor)
+                                .overlay(alignment: .topTrailing) {
+                                    if group.opportunities.count > 1 {
+                                        Text("\(group.opportunities.count)")
+                                            .font(.caption2.bold())
+                                            .foregroundStyle(.white)
+                                            .padding(5)
+                                            .background(.primaryLitePurple, in: Circle())
+                                            .offset(x: 8, y: -8)
+                                    }
+                                }
                                 .onTapGesture {
-                                    model.select(opportunity)
+                                    if group.opportunities.count == 1 {
+                                        model.select(opportunity)
+                                    } else {
+                                        selectedGroup = group
+                                    }
                                 }
                         }
                     }
                 }
             }
             .ignoresSafeArea()
+            .onMapCameraChange(frequency: .onEnd) { context in
+                model.updateVisibleMapRect(context.rect)
+            }
 
             VStack(alignment: .leading, spacing: 20) {
                 MapSearchBar(text: $model.searchText, selectedCategory: $model.selectedCategory)
                     .padding(.horizontal, 20)
-                    .padding(.top, -40)
+                    .padding(.top, 12)
 
                 HStack {
                     OportunityMarker(count: .constant(model.opportunitiesCount))
@@ -39,6 +57,14 @@ struct MapView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 20)
+
+                if model.locationDenied {
+                    Link("Разрешить геолокацию в настройках", destination: URL(string: UIApplication.openSettingsURLString)!)
+                        .font(.footnote.weight(.medium))
+                        .padding(10)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal, 20)
+                }
 
                 Spacer()
 
@@ -92,6 +118,24 @@ struct MapView: View {
             }
             .animation(.spring(response: 0.35), value: model.selectedOpportunity?.id)
         }
+        .sheet(item: $selectedGroup) { group in
+            NavigationStack {
+                List(group.opportunities) { opportunity in
+                    Button {
+                        selectedGroup = nil
+                        model.select(opportunity)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(opportunity.title).font(.headline)
+                            Text(opportunity.locationName).font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .navigationTitle("События в этом месте")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+            .presentationDetents([.medium, .large])
+        }
         .sheet(item: $presentedOpportunity) { opportunity in
             NavigationStack {
                 OpportunityDetailsView(
@@ -101,6 +145,7 @@ struct MapView: View {
             }
         }
         .task(id: refreshID) {
+            model.requestLocation()
             await model.load()
         }
     }

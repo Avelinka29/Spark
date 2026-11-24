@@ -10,7 +10,16 @@ struct RegisterRequest: Encodable {
     let email: String
     let password: String
     let name: String
+    let username: String
+    let organizationName: String?
+    enum CodingKeys: String, CodingKey {
+        case email, password, name, username
+        case organizationName = "organization_name"
+    }
 }
+
+struct UsernameRequest: Encodable { let username: String }
+struct UsernameLookup: Decodable { let id: UUID; let name: String; let username: String }
 
 struct EmailRequest: Encodable {
     let email: String
@@ -237,6 +246,7 @@ struct ProfileDTO: Decodable {
     let id: UUID
     let email: String
     let name: String
+    let username: String?
     let region: String
     let bio: String
     let skills: [String]
@@ -246,7 +256,7 @@ struct ProfileDTO: Decodable {
     let organizationStatus: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, email, name, region, bio, skills, interests
+        case id, email, name, username, region, bio, skills, interests
         case accountType = "account_type"
         case organizationName = "organization_name"
         case organizationStatus = "organization_status"
@@ -264,6 +274,7 @@ struct ProfileDTO: Decodable {
             accountType: accountType,
             organizationName: organizationName,
             organizationStatus: organizationStatus
+            , username: username
         )
     }
 }
@@ -378,6 +389,7 @@ struct ProfileUpdateRequest: Encodable {
 struct PublicProfileDTO: Identifiable, Decodable, Equatable {
     let id: UUID
     let name: String
+    let username: String?
     let region: String
     let bio: String
     let skills: [String]
@@ -387,7 +399,7 @@ struct PublicProfileDTO: Identifiable, Decodable, Equatable {
     let events: [PortfolioEventDTO]
 
     enum CodingKeys: String, CodingKey {
-        case id, name, region, bio, skills, interests, projects, events
+        case id, name, username, region, bio, skills, interests, projects, events
         case friendshipStatus = "friendship_status"
     }
 }

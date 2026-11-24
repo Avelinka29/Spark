@@ -12,6 +12,7 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 from sqlalchemy import and_, delete, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from starlette.concurrency import run_in_threadpool
@@ -23,6 +24,7 @@ from .email_service import send_auth_code
 from .models import Achievement, Application, ApplicationStatus, AuthCode, AuthCodePurpose, Bookmark, ChatMember, ChatMessage, EventProposal, Friendship, FriendshipStatus, Notification, Opportunity, OpportunityAttendance, Project, ProjectChat, ProjectRole, TeamTask, TeamWorkspace, User
 from .schemas import (
     LoginRequest,
+    UsernameUpdate,
     ApplicationResponse,
     ApplicationStatusUpdate,
     AchievementCreate,
@@ -149,11 +151,18 @@ async def register(payload: RegisterRequest, session: AsyncSession = Depends(get
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
         name=payload.name,
+        username=payload.username,
+        organization_name=payload.organization_name,
+        organization_status="pending" if payload.organization_name else None,
         email_verified=False,
         account_type="admin" if get_settings().is_admin_email(payload.email) else "user",
     )
     session.add(user)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Email or username is already registered")
     await session.refresh(user)
     code = await issue_auth_code(session, user, AuthCodePurpose.verify_email)
     development_code = await deliver_auth_code(user.email, code, AuthCodePurpose.verify_email)
@@ -182,6 +191,10 @@ async def verify_email(payload: VerifyCodeRequest, session: AsyncSession = Depen
         raise HTTPException(status_code=400, detail="Invalid or expired verification code")
     auth_code = await valid_auth_code(session, user, AuthCodePurpose.verify_email, payload.code)
     user.email_verified = True
+    if user.organization_status == "pending" and user.organization_name:
+        admin_ids = list(await session.scalars(select(User.id).where(User.account_type == "admin")))
+        for admin_id in admin_ids:
+            session.add(Notification(user_id=admin_id, title="Заявка организации", message=f"{user.name}: {user.organization_name}"))
     await session.delete(auth_code)
     await session.commit()
     return MessageResponse(message="Email verified")
@@ -958,7 +971,7 @@ async def list_organization_applications(
 ) -> list[OrganizationApplicationResponse]:
     if user.account_type != "admin":
         raise HTTPException(status_code=403, detail="Administrator access required")
-    applicants = (await session.scalars(select(User).where(User.organization_status == "pending"))).all()
+    applicants = (await session.scalars(select(User).where(User.organization_status == "pending", User.email_verified.is_(True)))).all()
     return [OrganizationApplicationResponse.model_validate(applicant, from_attributes=True) for applicant in applicants]
 
 
@@ -972,7 +985,7 @@ async def decide_organization_application(
     applicant = await session.scalar(select(User).where(User.id == user_id).with_for_update())
     if applicant is None:
         raise HTTPException(status_code=404, detail="Application not found")
-    if applicant.organization_status != "pending":
+    if applicant.organization_status != "pending" or not applicant.email_verified:
         raise HTTPException(status_code=409, detail="Application is not pending")
     applicant.organization_status = payload.status
     if payload.status == "approved":
@@ -1008,6 +1021,28 @@ def friendship_label(friendship: Friendship | None, user_id: uuid.UUID) -> str:
     return "pending_sent" if friendship.requester_id == user_id else "pending_received"
 
 
+@app.get("/api/v1/profiles/by-username/{username}")
+async def find_profile_by_username(username: str, user: User = Depends(current_user),
+                                   session: AsyncSession = Depends(get_session)) -> dict:
+    profile = await session.scalar(select(User).where(User.username == username.lower(), User.email_verified.is_(True)))
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Username not found")
+    return {"id": profile.id, "name": profile.name, "username": profile.username}
+
+
+@app.put("/api/v1/profile/username", response_model=ProfileResponse)
+async def set_username(payload: UsernameUpdate, user: User = Depends(current_user),
+                       session: AsyncSession = Depends(get_session)) -> User:
+    user.username = payload.username
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Username already registered")
+    await session.refresh(user)
+    return user
+
+
 @app.get("/api/v1/profiles/{profile_id}", response_model=PublicProfileResponse)
 async def public_profile(
     profile_id: uuid.UUID,
@@ -1035,6 +1070,7 @@ async def public_profile(
     return PublicProfileResponse(
         id=profile.id,
         name=profile.name,
+        username=profile.username,
         region=profile.region,
         bio=profile.bio,
         skills=profile.skills,

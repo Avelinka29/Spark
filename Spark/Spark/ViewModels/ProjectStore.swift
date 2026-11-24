@@ -35,6 +35,9 @@ final class ProjectStore {
         aiMessage = nil
         defer { aiIsLoading = false }
         do {
+            // Refresh candidates before matching so newly added projects can be displayed.
+            let currentProjects: [ProjectDTO] = try await APIClient.shared.send(path: "projects")
+            projects = currentProjects.map { $0.makeProject() }
             let matches: [AIProjectMatchDTO] = try await APIClient.shared.send(
                 path: "recommendations/projects", method: "POST", token: token)
             aiMatches = matches.filter { match in projects.contains { $0.id == match.id } }
