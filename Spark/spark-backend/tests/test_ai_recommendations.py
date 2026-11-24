@@ -37,3 +37,13 @@ async def test_invalid_output_is_rejected() -> None:
     with pytest.raises(ValueError, match="Invalid AI response"):
         await rank_projects("http://model", "test-model", [], [],
             [{"id": str(uuid.uuid4())}], transport=httpx.MockTransport(respond))
+
+
+@pytest.mark.asyncio
+async def test_model_connection_failure_is_not_reported_as_a_match() -> None:
+    def fail(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("unavailable", request=request)
+
+    with pytest.raises(httpx.ConnectError):
+        await rank_projects("http://model", "test-model", ["Swift"], [],
+            [{"id": str(uuid.uuid4())}], transport=httpx.MockTransport(fail))

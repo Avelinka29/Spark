@@ -84,6 +84,12 @@ Ollama should remain private. Production requires an HTTPS endpoint and appropri
 access controls; do not expose an unauthenticated model server to the public Internet.
 The current adapter targets local Ollama structured output, not a generic cloud API.
 
+For the user-local macOS installation, start the model service in a separate terminal
+with `sh start-local-ai.sh`. The script uses CPU mode to work when Metal access is
+unavailable, and keeps running until stopped with Ctrl-C. After restarting the Mac,
+start it again before using AI matching. If Ollama is installed elsewhere, set the
+`OLLAMA_BINARY` environment variable. The service listens only on localhost by default.
+
 ## Production preparation
 
 `docker-compose.production.yml` is a hardened starting point for a single server. It does not expose PostgreSQL publicly and refuses to start without the required secrets, Google client ID and SMTP credentials.
