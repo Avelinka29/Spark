@@ -19,6 +19,23 @@ final class SparkUITests: XCTestCase {
     }
 
     @MainActor
+    func testRegistrationDismissesKeyboard() throws {
+        let app = XCUIApplication()
+        app.launch()
+        app.buttons["Регистрация"].tap()
+
+        let name = app.textFields["Имя"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3))
+
+        app.buttons["Зарегистрироваться"].tap()
+        let keyboardGone = NSPredicate(format: "exists == false")
+        expectation(for: keyboardGone, evaluatedWith: app.keyboards.firstMatch)
+        waitForExpectations(timeout: 5)
+    }
+
+    @MainActor
     func testGuestCanOpenMainApplication() throws {
         let app = XCUIApplication()
         app.launch()

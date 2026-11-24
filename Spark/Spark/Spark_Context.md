@@ -54,7 +54,7 @@ Firebase в проекте не используется.
 ## Конфигурация Spark Backend
 
 - Симулятор: `http://127.0.0.1:8000/api/v1/`.
-- Реальный iPhone в одной Wi-Fi сети с Mac: `http://MacBook-Air-YULIYA.local:8000/api/v1/`.
+- Реальный iPhone в одной Wi-Fi сети с Mac: `http://MacBook-Air-AVELINA.local:8000/api/v1/`. Разрешите Spark доступ к локальной сети в настройках iPhone. Если имя Mac изменится, укажите актуальный адрес через `SPARK_API_BASE_URL`.
 - Для временного переопределения при запуске можно использовать переменную окружения `SPARK_API_BASE_URL`.
 - Для TestFlight и App Store production-адрес задаётся строковым ключом Info.plist `SparkAPIBaseURL`.
 - Backend должен слушать `0.0.0.0:8000`, а Docker Engine и контейнеры должны быть запущены.

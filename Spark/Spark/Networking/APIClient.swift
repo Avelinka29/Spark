@@ -3,6 +3,7 @@ import Foundation
 enum APIError: LocalizedError {
     case invalidResponse
     case networkUnavailable
+    case requestTimedOut
     case server(statusCode: Int, message: String)
     case notAuthenticated
 
@@ -12,6 +13,8 @@ enum APIError: LocalizedError {
             return "Сервер вернул некорректный ответ."
         case .networkUnavailable:
             return "Не удалось подключиться к Spark Backend. Проверьте интернет-соединение и доступность сервера."
+        case .requestTimedOut:
+            return "Сервер не ответил вовремя. Проверьте соединение и попробуйте снова."
         case let .server(_, message):
             return message
         case .notAuthenticated:
@@ -56,6 +59,9 @@ actor APIClient {
 
         var request = URLRequest(url: url)
         request.httpMethod = method
+        if path.hasPrefix("auth/") {
+            request.timeoutInterval = 20
+        }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         if let body {
@@ -74,8 +80,10 @@ actor APIClient {
             (data, response) = try await session.data(for: request)
         } catch let error as URLError {
             switch error.code {
+            case .timedOut:
+                throw APIError.requestTimedOut
             case .notConnectedToInternet, .cannotConnectToHost, .cannotFindHost,
-                    .dnsLookupFailed, .networkConnectionLost, .timedOut:
+                    .dnsLookupFailed, .networkConnectionLost:
                 throw APIError.networkUnavailable
             default:
                 throw error
@@ -114,8 +122,8 @@ actor APIClient {
         switch message {
         case "Invalid email or password" where statusCode == 401:
             return "Неверный email или пароль."
-        case "Email already registered":
-            return "Пользователь с таким email уже зарегистрирован."
+        case "Email already registered", "Email is already registered":
+            return "Пользователь с таким email уже зарегистрирован. Попробуйте войти и подтвердить email."
         case "Invalid Google token":
             return "Google не подтвердил вход. Попробуйте ещё раз."
         case "Google email is not verified":
@@ -169,7 +177,7 @@ private enum APIConfiguration {
 #if targetEnvironment(simulator)
         return URL(string: "http://127.0.0.1:8000/api/v1/")!
 #else
-        return URL(string: "http://MacBook-Air-YULIYA.local:8000/api/v1/")!
+        return URL(string: "http://MacBook-Air-AVELINA.local:8000/api/v1/")!
 #endif
     }()
 

@@ -357,6 +357,7 @@ struct LoginView: View {
                             }
 
                             SparkButton(title: "Зарегистрироваться", icon: "arrow.forward", backgroundColor: .litePurple, isInfinity: true) {
+                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                                 Task {
                                     let succeeded = await authStore.register(
                                         name: userName,
@@ -369,6 +370,10 @@ struct LoginView: View {
                                 }
                             }
                             .disabled(authStore.isLoading)
+                            if authStore.isLoading {
+                                ProgressView("Регистрируем…")
+                                    .font(.footnote)
+                            }
                             
                             
                             HStack{

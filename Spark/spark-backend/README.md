@@ -11,6 +11,14 @@ FastAPI API with PostgreSQL for Spark.
 5. Start the API: `uvicorn app.main:app --reload`.
 6. Open `http://127.0.0.1:8000/docs`.
 
+For an iPhone, start the API in Docker so port 8000 is reachable on the local
+network, connect the phone and Mac to the same Wi-Fi, and allow Spark access to
+the local network in iOS Settings. The current device default is
+`http://MacBook-Air-AVELINA.local:8000/api/v1/`; if the Mac's local hostname
+changes, set `SPARK_API_BASE_URL` in the Xcode scheme to the new API URL.
+The iOS Simulator uses `http://127.0.0.1:8000/api/v1/` by default.
+Local HTTP is intended for development; use HTTPS for a deployed API.
+
 The initial SQL schema is applied by PostgreSQL only when its Docker volume is first created.
 For deployed environments, add Alembic migrations before changing the schema.
 
