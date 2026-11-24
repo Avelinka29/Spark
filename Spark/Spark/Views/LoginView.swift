@@ -17,6 +17,7 @@ struct LoginView: View {
     @State private var userEmail: String = ""
     @State private var userPassword: String = ""
     @State private var showHome = false
+    @State private var isGuestMode = false
     @State private var showBiometricOffer = false
     @State private var showEmailVerification = false
     @State private var showPasswordReset = false
@@ -314,6 +315,7 @@ struct LoginView: View {
                                 
                                 Button {
                                     authStore.continueAsGuest()
+                                    isGuestMode = true
                                     showHome = true
                                 }
                                 label: {
@@ -432,6 +434,7 @@ struct LoginView: View {
                                 
                                 Button {
                                     authStore.continueAsGuest()
+                                    isGuestMode = true
                                     showHome = true
                                 }
                                 label: {
@@ -518,15 +521,18 @@ struct LoginView: View {
         }
         .fullScreenCover(isPresented: $showHome) {
             MainTabView(
-                accessToken: authStore.accessToken,
+                accessToken: isGuestMode ? nil : authStore.accessToken,
                 isBiometricEnabled: authStore.isBiometricEnabled,
                 canUseBiometrics: authStore.canUseBiometrics,
                 onBiometricChange: { enabled in
                     await authStore.setBiometricEnabled(enabled)
                 }
             ) {
-                authStore.logout()
+                if !isGuestMode {
+                    authStore.logout()
+                }
                 showHome = false
+                isGuestMode = false
             }
         }
         .sensoryFeedback(.success, trigger: showHome) { _, isPresented in

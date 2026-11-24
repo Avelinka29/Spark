@@ -63,4 +63,18 @@ final class SparkUITests: XCTestCase {
         XCTAssertTrue(search.waitForExistence(timeout: 5))
         XCTAssertTrue(search.isHittable)
     }
+
+    @MainActor
+    func testGuestCommunityRequiresAccount() throws {
+        let app = XCUIApplication()
+        app.launch()
+        app.buttons["Пропустить и посмотреть приложение"].tap()
+        app.buttons["Сообщество"].tap()
+
+        XCTAssertTrue(app.buttons["Войти или зарегистрироваться"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.images["QR-код профиля"].exists)
+        XCTAssertFalse(app.buttons["Найти друга по нику"].exists)
+        app.buttons["Войти или зарегистрироваться"].tap()
+        XCTAssertTrue(app.staticTexts["С возвращением!"].waitForExistence(timeout: 5))
+    }
 }

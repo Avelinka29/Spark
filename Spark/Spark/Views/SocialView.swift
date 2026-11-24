@@ -6,6 +6,7 @@ import VisionKit
 struct SocialView: View {
     let store: SocialStore
     let currentUserID: UUID?
+    let onSignIn: () -> Void
 
     @State private var showScanner = false
     @State private var showManualEntry = false
@@ -17,6 +18,8 @@ struct SocialView: View {
 
     var body: some View {
         NavigationStack {
+            Group {
+            if store.isAuthenticated {
             ScrollView {
                 LazyVStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 6) {
@@ -76,6 +79,10 @@ struct SocialView: View {
                     ChatsSection(chats: store.chats, store: store, currentUserID: currentUserID)
                 }
                 .padding()
+            }
+            } else {
+                GuestCommunityView(onSignIn: onSignIn)
+            }
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Сообщество")
@@ -145,6 +152,30 @@ struct SocialView: View {
                 )
             }
         }
+    }
+}
+
+private struct GuestCommunityView: View {
+    let onSignIn: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.2.circle")
+                .font(.system(size: 56))
+                .foregroundStyle(.primaryLitePurple)
+            Text("Сообщество ждёт тебя")
+                .font(.title3.bold())
+            Text("Войди или создай аккаунт, чтобы находить друзей, делиться своим QR-кодом и общаться с командой.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Войти или зарегистрироваться", action: onSignIn)
+                .buttonStyle(.borderedProminent)
+                .tint(.primaryLitePurple)
+                .padding(.top, 4)
+        }
+        .padding(28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

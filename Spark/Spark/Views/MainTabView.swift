@@ -87,7 +87,8 @@ struct MainTabView: View {
 
                 SocialView(
                     store: socialStore,
-                    currentUserID: profileStore.profile?.id
+                    currentUserID: accessToken == nil ? nil : profileStore.profile?.id,
+                    onSignIn: onLogout
                 )
                     .tabItem {
                         Label("Сообщество", systemImage: "person.2")
