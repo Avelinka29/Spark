@@ -19,21 +19,11 @@ struct ProfileHeader: View {
  
             ZStack {
                 LinearGradient(
-                    colors: [
-                        Color("PrimaryBlue"),
-                        Color("PrimaryLitePurple"),
-                        Color("PrimaryPurple")
-                    ],
+                    colors: [Color("PrimaryBlue"), Color("PrimaryLitePurple"), Color("PrimaryPurple")],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 28))
-                
-                Circle()
-                    .fill(.primaryYellow)
-                    .blur(radius: 60)
-                    .frame(width: 100, height: 120)
-                    .offset(x: 160, y: 8)
                 
                 VStack {
                     
@@ -58,6 +48,7 @@ struct ProfileHeader: View {
                             }
                             
                         }
+                        .accessibilityLabel("Настройки профиля")
                     }
 
                     
@@ -75,7 +66,7 @@ struct ProfileHeader: View {
                 onImageSelected: onAvatarSelected
             )
    
-        }.frame(height: 170)
+        }.frame(height: 145)
             .padding(.horizontal, 16)
     }
 }

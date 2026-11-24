@@ -20,9 +20,9 @@ struct SocialView: View {
             ScrollView {
                 LazyVStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Вместе интереснее")
-                            .font(.title2.bold())
-                        Text("Находите друзей и развивайте проекты вместе")
+                        Text("Твои люди — рядом")
+                            .font(.title3.bold())
+                        Text("Знакомься, объединяйся в команды и создавай проекты")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -30,10 +30,17 @@ struct SocialView: View {
                     Button {
                         showUsernameSearch = true
                     } label: {
-                        Label("Найти друга по нику", systemImage: "magnifyingglass")
-                            .frame(maxWidth: .infinity)
-                            .padding(14)
-                            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                        HStack(spacing: 12) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundStyle(.primaryLitePurple)
+                            Text("Найти друга по нику")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: "arrow.right").foregroundStyle(.secondary)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .padding(16)
+                        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
                     }
                     if let currentUserID {
                         ProfileShareCard(
@@ -157,43 +164,70 @@ private struct ProfileShareCard: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Мой профиль")
-                .font(.title2.bold())
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "qrcode")
+                    .foregroundStyle(.primaryLitePurple)
+                    .font(.title3)
+                    .frame(width: 42, height: 42)
+                    .background(Color.primaryLitePurple.opacity(0.1), in: RoundedRectangle(cornerRadius: 13))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Твой QR-код").font(.headline)
+                    Text("Друзья смогут быстро найти твой профиль")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
 
             if let image = QRCodeGenerator.image(for: profileURL.absoluteString) {
                 Image(uiImage: image)
                     .interpolation(.none)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 170, height: 170)
+                    .frame(width: 150, height: 150)
+                    .padding(12)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 16))
                     .accessibilityLabel("QR-код профиля")
             }
 
-            Text("Покажите QR-код, чтобы вас добавили в друзья.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            HStack {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    ShareLink(item: profileURL) {
+                        Label("Поделиться", systemImage: "square.and.arrow.up")
+                            .fixedSize(horizontal: true, vertical: false)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button(action: onScan) {
+                        Label("Сканировать", systemImage: "qrcode.viewfinder")
+                            .fixedSize(horizontal: true, vertical: false)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                VStack(spacing: 10) {
                 ShareLink(item: profileURL) {
                     Label("Поделиться", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-
                 Button(action: onScan) {
                     Label("Сканировать", systemImage: "qrcode.viewfinder")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+                }
             }
+            .tint(.primaryLitePurple)
+            .controlSize(.regular)
 
             Button("Ввести ссылку вручную", action: onEnterLink)
                 .font(.footnote)
-            Button("Посмотреть мой профиль и портфолио", action: onViewProfile)
+            Button("Открыть мой профиль", action: onViewProfile)
                 .font(.footnote)
         }
         .padding(20)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24))
     }
 }
 

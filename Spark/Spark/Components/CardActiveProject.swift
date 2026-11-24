@@ -15,117 +15,44 @@ struct CardActiveProject: View {
     let description: String
     let isAuthenticated: Bool
     
-    private let columns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
-    ]
-    
-    
     let vacancies: [Vacancy]
     
     var countOpen: Int {
         vacancies.filter {$0.isActive}.count
     }
     
-    var countClose: Int {
-        vacancies.filter {!$0.isActive}.count
-    }
-    
     
     var body: some View {
         
         
-        VStack(alignment: .leading, spacing: 14) {
-            Text(category)
-                .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.primaryWhite)
-                    .opacity(0.6)
-
-            Text(title)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.primaryWhite)
-
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(category)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(color.color)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(color.color.opacity(0.1), in: Capsule())
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+            Text(title).font(.headline).foregroundStyle(.primary)
             Text(description)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.primaryWhite.opacity(0.72))
-                .lineSpacing(3)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
-
-            if !vacancies.isEmpty {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(vacancies) { vacancy in
-                        ProjectRoleCard(vacancy: vacancy)
-                    }
-                }
-            }
-
-            HStack(spacing: 8) {
-                Text("\(countOpen) открыто")
-                    .foregroundStyle(.primaryYellow)
-
-                Text("\(countClose) занято")
-                    .foregroundStyle(.primaryWhite.opacity(0.6))
-
-                Spacer(minLength: 8)
-
-                Label(
-                    isAuthenticated ? "Подробнее" : "Войдите",
-                    systemImage: isAuthenticated ? "arrow.right" : "lock"
-                )
-                .foregroundStyle(.primaryWhite)
-                .font(.system(size: 15, weight: .semibold))
-                .padding(.horizontal, 14)
-                .frame(minHeight: 40)
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(.primaryWhite, lineWidth: 1)
-                }
-            }
-            .font(.system(size: 16, weight: .bold))
+            Divider().padding(.vertical, 2)
+            Label("Открытых ролей: \(countOpen)", systemImage: "person.2")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(color.color)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(color.color)
+        .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 20))
-    }
-}
-
-private struct ProjectRoleCard: View {
-    let vacancy: Vacancy
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(vacancy.title, systemImage: vacancy.imageName)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.primaryWhite.opacity(0.72))
-                .lineLimit(2)
-
-            Text(vacancy.roleDescription)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.primaryWhite)
-                .lineLimit(2)
-
-            Text(vacancy.status)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(.primaryWhite.opacity(0.72))
-                .padding(.top, 2)
-        }
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
-        .padding(14)
-        .background(
-            vacancy.isActive
-                ? Color.white.opacity(0.18)
-                : Color.black.opacity(0.16)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay {
-            if vacancy.isActive {
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(.primaryWhite.opacity(0.32), lineWidth: 2)
-            }
-        }
     }
 }
 

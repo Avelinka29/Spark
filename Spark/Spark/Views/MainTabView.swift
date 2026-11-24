@@ -74,7 +74,11 @@ struct MainTabView: View {
                 ProjectView(
                     store: projectStore,
                     currentUserID: profileStore.profile?.id,
-                    profile: accessToken == nil ? nil : profileStore.profile
+                    profile: accessToken == nil ? nil : profileStore.profile,
+                    onCreateProject: {
+                        if accessToken == nil { showAuthenticationRequired = true }
+                        else { showCreateProject = true }
+                    }
                 )
                     .tabItem {
                         Label("Проекты", systemImage: "folder")
@@ -107,7 +111,7 @@ struct MainTabView: View {
                     .tag(4)
             }
 
-            if selectedTab == 0 || selectedTab == 2 {
+            if selectedTab == 0 {
                 VStack {
                     Spacer()
 

@@ -4,6 +4,7 @@ struct ProjectView: View {
     let store: ProjectStore
     let currentUserID: UUID?
     var profile: UserProfile? = nil
+    var onCreateProject: () -> Void = {}
     @State private var showAIConfirmation = false
 
     private var recommendations: [ProjectRecommendation] {
@@ -13,7 +14,7 @@ struct ProjectView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     ProjectSummary(
                         projectsCount: store.projects.count,
                         rolesCount: store.openRolesCount
@@ -30,25 +31,24 @@ struct ProjectView: View {
                             }
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(.primaryLitePurple)
+                        .controlSize(.large)
+                        .frame(maxWidth: .infinity)
                         .disabled(store.aiIsLoading)
                         if let message = store.aiMessage {
                             Text(message).font(.footnote).foregroundStyle(.secondary)
                         }
                         if !store.aiMatches.isEmpty {
                             Text("Подбор ИИ").font(.title3.bold()).frame(maxWidth: .infinity, alignment: .leading)
-                            Text("ИИ может ошибаться — проверь описание проекта.")
+                            Text("Рекомендации стоит проверить по описанию роли.")
                                 .font(.caption).foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             ForEach(store.aiMatches) { match in
                                 if let project = store.projects.first(where: { $0.id == match.id }) {
                                     NavigationLink {
                                         ProjectDetailsView(project: project, store: store, isOwner: false)
                                     } label: {
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            Text(project.title).font(.headline)
-                                            Text(match.reason).font(.subheadline).foregroundStyle(.secondary)
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding().background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                                        RecommendationCard(project: project, reasons: [match.reason], symbol: "sparkles")
                                     }.buttonStyle(.plain)
                                 }
                             }
@@ -56,22 +56,14 @@ struct ProjectView: View {
                     }
 
                     if !recommendations.isEmpty {
-                        Text("Подходит тебе")
+                        Text("Совпадения по профилю")
                             .font(.title3.bold())
                             .frame(maxWidth: .infinity, alignment: .leading)
                         ForEach(recommendations.prefix(3)) { recommendation in
                             NavigationLink {
                                 ProjectDetailsView(project: recommendation.project, store: store, isOwner: false)
                             } label: {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(recommendation.project.title).font(.headline)
-                                    ForEach(recommendation.reasons, id: \.self) { reason in
-                                        Text(reason).font(.subheadline).foregroundStyle(.secondary)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding()
-                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                                RecommendationCard(project: recommendation.project, reasons: recommendation.reasons, symbol: "checkmark.seal")
                             }
                             .buttonStyle(.plain)
                         }
@@ -123,9 +115,19 @@ struct ProjectView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
-                .padding(.bottom, 180)
+                .padding(.bottom, 32)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("ProjectHub")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: onCreateProject) {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Создать проект")
+                }
+            }
             .alert("Подбор с ИИ", isPresented: $showAIConfirmation) {
                 Button("Продолжить") { Task { await store.loadAIRecommendations() } }
                 Button("Отмена", role: .cancel) {}
@@ -150,34 +152,58 @@ struct ProjectView: View {
     }
 }
 
+private struct RecommendationCard: View {
+    let project: Project
+    let reasons: [String]
+    let symbol: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: symbol)
+                .font(.headline)
+                .foregroundStyle(.primaryLitePurple)
+                .frame(width: 38, height: 38)
+                .background(Color.primaryLitePurple.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 7) {
+                Text(project.category.uppercased())
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.primaryLitePurple)
+                Text(project.title).font(.headline).foregroundStyle(.primary)
+                ForEach(reasons, id: \.self) { reason in
+                    Text(reason).font(.subheadline).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+    }
+}
+
 private struct ProjectSummary: View {
     let projectsCount: Int
     let rolesCount: Int
 
     var body: some View {
-        HStack {
-            ActiveProject(
-                color: .litePurple,
-                imageName: "sparkles",
-                title: "ПРОЕКТЫ",
-                status: "активных",
-                type: .count(projectsCount),
-                isActive: true,
-                strokeWidht: 3,
-                titleSize: 26
-            )
-
-            ActiveProject(
-                color: .green,
-                imageName: "person.2",
-                title: "РОЛИ",
-                status: "открыто",
-                type: .count(rolesCount),
-                isActive: true,
-                strokeWidht: 3,
-                titleSize: 26
-            )
+        HStack(spacing: 12) {
+            summaryItem(value: projectsCount, title: "проектов", symbol: "square.stack.3d.up")
+            summaryItem(value: rolesCount, title: "открытых ролей", symbol: "person.2")
         }
+    }
+
+    private func summaryItem(value: Int, title: String, symbol: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: symbol).foregroundStyle(.primaryLitePurple)
+            Text("\(value)").font(.title2.bold())
+            Text(title).font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
     }
 }
 
@@ -195,26 +221,45 @@ private struct ProjectDetailsView: View {
     }
 
     var body: some View {
-        List {
-            Section("О проекте") {
-                Text(currentProject.summary)
-                Label(currentProject.ownerRole, systemImage: "person.crop.circle")
-                Label("\(currentProject.memberCount) участников", systemImage: "person.2")
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(currentProject.category.uppercased())
+                        .font(.caption.weight(.bold)).foregroundStyle(.primaryLitePurple)
+                    Text(currentProject.title)
+                        .font(.title.bold())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(currentProject.summary)
+                        .font(.body).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Divider().padding(.vertical, 4)
+                    Label(currentProject.ownerRole, systemImage: "person.crop.circle")
+                    Label("\(currentProject.memberCount) в команде", systemImage: "person.2")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
 
-            Section("Роли") {
+                Text("Роли в команде").font(.title3.bold())
                 if !store.isAuthenticated {
                     Label("Войдите, чтобы откликаться на роли", systemImage: "lock")
-                        .foregroundStyle(.secondary)
+                        .font(.subheadline).foregroundStyle(.secondary)
                 }
 
                 ForEach(currentProject.vacancies) { vacancy in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(vacancy.title)
-                            .font(.headline)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text(vacancy.title).font(.headline)
+                            Spacer()
+                            Text(vacancy.isActive ? "Открыта" : vacancy.status)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(vacancy.isActive ? Color.primaryLitePurple : Color.secondary)
+                        }
                         Text(vacancy.roleDescription)
-                            .foregroundStyle(.secondary)
+                            .font(.subheadline).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
 
+                        if !isOwner {
                         Button(vacancy.isActive ? "Откликнуться" : vacancy.status) {
                             Task {
                                 await store.join(
@@ -223,20 +268,27 @@ private struct ProjectDetailsView: View {
                                 )
                             }
                         }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.primaryLitePurple)
                         .disabled(!vacancy.isActive || !store.isAuthenticated)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
                 }
-            }
 
-            if isOwner {
-                Section {
+                if isOwner {
                     Button("Удалить проект", role: .destructive) {
                         showDeleteConfirmation = true
                     }
                 }
             }
+            .padding(20)
+            .padding(.bottom, 24)
         }
-        .navigationTitle(currentProject.title)
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Проект")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if isOwner {

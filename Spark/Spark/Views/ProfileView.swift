@@ -90,7 +90,7 @@ private struct ProfileContent: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: 18) {
                 ProfileHeader(
                     avatarImage: avatarImage,
                     canEditAvatar: canEditAvatar,
@@ -103,15 +103,20 @@ private struct ProfileContent: View {
                     region: profile.region,
                     bio: profile.bio
                 )
+                .padding(.top, 32)
 
                 if canEditAvatar {
                     Button {
                         username = profile.username ?? ""
                         showUsernameEditor = true
                     } label: {
-                        Label(profile.username.map { "@\($0)" } ?? "Добавить ник для поиска", systemImage: "at")
+                        Text(profile.username.map { "@\($0)" } ?? "Добавить ник для поиска")
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(Color.primaryLitePurple.opacity(0.10), in: Capsule())
                     }
                     .font(.subheadline.weight(.medium))
+                    .tint(.primaryLitePurple)
                     Button {
                         showProfileEditor = true
                     } label: {
@@ -119,6 +124,7 @@ private struct ProfileContent: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
+                    .tint(.primaryLitePurple)
                     .padding(.horizontal, 24)
                 }
 
@@ -164,7 +170,7 @@ private struct ProfileContent: View {
                     }
                     .padding(20)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 22))
+                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
                     .padding(.horizontal, 24)
                 }
                 AchievementSection(
@@ -551,7 +557,7 @@ private struct OrganizationActionsSection: View {
                 }
             } else {
                 Button(action: onProposeEvent) {
-                    Label("Предложить событие администратору", systemImage: "paperplane")
+                    Label("Предложить событие", systemImage: "paperplane")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -567,10 +573,11 @@ private struct OrganizationActionsSection: View {
                             .foregroundStyle(.secondary)
                     }
                     Button(action: onSetup) {
-                        Label("Подать заявку организации", systemImage: "building.2")
+                        Label("Аккаунт организации", systemImage: "building.2")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
+                    .tint(.primaryLitePurple)
                 }
             }
         }

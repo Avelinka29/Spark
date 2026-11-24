@@ -16,19 +16,18 @@ struct ProfileAvatar: View {
     @State private var selectedItem: PhotosPickerItem?
 
     var body: some View {
-        HStack {
             ZStack {
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 24)
                     .foregroundStyle(Color(.secondarySystemBackground))
-                    .frame(width: 75, height: 75)
-                    .shadow(radius: 20, y: 4)
+                    .frame(width: 88, height: 88)
+                    .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
 
                 if let image {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 75, height: 75)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .frame(width: 88, height: 88)
+                        .clipShape(RoundedRectangle(cornerRadius: 24))
                 } else {
                     Image(systemName: "person.fill")
                         .foregroundStyle(.primaryLitePurple)
@@ -48,10 +47,7 @@ struct ProfileAvatar: View {
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 20)
-            .offset(y: 55)
-        }
+            .offset(y: 65)
         .task(id: selectedItem) {
             guard let data = try? await selectedItem?.loadTransferable(type: Data.self) else {
                 return
