@@ -33,6 +33,7 @@ final class SparkUITests: XCTestCase {
         let keyboardGone = NSPredicate(format: "exists == false")
         expectation(for: keyboardGone, evaluatedWith: app.keyboards.firstMatch)
         waitForExpectations(timeout: 5)
+        XCTAssertTrue(app.alerts["Не удалось зарегистрироваться"].waitForExistence(timeout: 3))
     }
 
     @MainActor

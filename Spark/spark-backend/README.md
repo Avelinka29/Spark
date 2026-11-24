@@ -60,6 +60,8 @@ configure email delivery. Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
 `docker compose up -d --no-deps api`. For Gmail on port 587, use a Google app
 password for an account with two-step verification. Never commit credentials.
 Without SMTP, local development may instead display the test code in the app.
+The verification window can be closed; an unverified account can later request
+another code from the login screen after entering its email and password.
 
 Set `ADMIN_EMAILS` to a comma-separated list of administrator email addresses before
 creating their accounts. Existing accounts are not promoted by changing this setting;

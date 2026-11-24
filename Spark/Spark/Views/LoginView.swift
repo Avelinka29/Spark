@@ -20,6 +20,7 @@ struct LoginView: View {
     @State private var showBiometricOffer = false
     @State private var showEmailVerification = false
     @State private var showPasswordReset = false
+    @State private var registrationError: String?
     @State private var authStore = AuthStore()
     
     var body: some View {
@@ -385,6 +386,8 @@ struct LoginView: View {
                                     )
                                     if succeeded {
                                         showEmailVerification = true
+                                    } else {
+                                        registrationError = authStore.errorMessage ?? "Не удалось зарегистрироваться. Попробуйте ещё раз."
                                     }
                                 }
                             }
@@ -472,7 +475,11 @@ struct LoginView: View {
             EmailVerificationSheet(
                 store: authStore,
                 email: userEmail,
-                password: userPassword
+                password: userPassword,
+                onClose: {
+                    showEmailVerification = false
+                    selectedTab = 0
+                }
             ) {
                 showEmailVerification = false
                 if authStore.canUseBiometrics && !authStore.isBiometricEnabled {
@@ -487,6 +494,14 @@ struct LoginView: View {
                 showPasswordReset = false
                 selectedTab = 0
             }
+        }
+        .alert("Не удалось зарегистрироваться", isPresented: Binding(
+            get: { registrationError != nil },
+            set: { if !$0 { registrationError = nil } }
+        )) {
+            Button("Понятно", role: .cancel) {}
+        } message: {
+            Text(registrationError ?? "")
         }
         .alert("Включить Face ID?", isPresented: $showBiometricOffer) {
             Button("Не сейчас") {
@@ -503,6 +518,12 @@ struct LoginView: View {
         }
         .navigationBarBackButtonHidden(true)
         .onChange(of: userName) { _, _ in
+            authStore.clearError()
+        }
+        .onChange(of: userNickname) { _, _ in
+            authStore.clearError()
+        }
+        .onChange(of: organizationName) { _, _ in
             authStore.clearError()
         }
         .onChange(of: userEmail) { _, _ in
@@ -533,9 +554,12 @@ private struct EmailVerificationSheet: View {
     let store: AuthStore
     let email: String
     let password: String
+    let onClose: () -> Void
     let onVerified: () -> Void
 
     @State private var code = ""
+    @State private var isSubmitting = false
+    @State private var resendMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -558,25 +582,47 @@ private struct EmailVerificationSheet: View {
                     Text(error).foregroundStyle(.red)
                 }
 
-                Button("Отправить код ещё раз") {
-                    Task { await store.resendVerification(email: email) }
+                if let resendMessage {
+                    Text(resendMessage).font(.footnote).foregroundStyle(.secondary)
                 }
+
+                if isSubmitting {
+                    ProgressView("Подождите…")
+                }
+
+                Button("Отправить код ещё раз") {
+                    Task {
+                        isSubmitting = true
+                        resendMessage = nil
+                        await store.resendVerification(email: email)
+                        if store.errorMessage == nil {
+                            resendMessage = store.developmentCode == nil ? "Код отправлен." : "Новый тестовый код показан выше."
+                        }
+                        isSubmitting = false
+                    }
+                }
+                .disabled(isSubmitting)
             }
             .navigationTitle("Подтверждение email")
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Закрыть", action: onClose)
+                        .disabled(isSubmitting)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Подтвердить") {
                         Task {
+                            isSubmitting = true
                             if await store.verifyEmail(email: email, code: code, password: password) {
                                 onVerified()
                             }
+                            isSubmitting = false
                         }
                     }
-                    .disabled(code.count != 6)
+                    .disabled(code.count != 6 || isSubmitting)
                 }
             }
         }
-        .interactiveDismissDisabled()
     }
 }
 

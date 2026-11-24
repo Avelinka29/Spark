@@ -98,6 +98,9 @@ final class AuthStore {
             )
             developmentCode = response.developmentCode
             return true
+        } catch APIError.requestTimedOut {
+            errorMessage = "Сервер не ответил вовремя. Аккаунт мог уже создаться: попробуйте войти и подтвердить email."
+            return false
         } catch {
             errorMessage = error.localizedDescription
             return false
