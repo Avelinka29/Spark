@@ -1,6 +1,18 @@
 import Foundation
+import CoreLocation
 import Testing
 @testable import Spark
+
+struct MapLocationTests {
+    @Test @MainActor
+    func locationFailureIsHandledWithoutStoppingTheApp() {
+        let model = MapViewModel()
+        #expect(model.responds(to: #selector(CLLocationManagerDelegate.locationManager(_:didFailWithError:))))
+        model.locationManager(CLLocationManager(), didFailWithError: CLError(.locationUnknown))
+        #expect(model.locationError != nil)
+        #expect(!model.locationDenied)
+    }
+}
 
 struct OpportunityModelTests {
     @Test @MainActor

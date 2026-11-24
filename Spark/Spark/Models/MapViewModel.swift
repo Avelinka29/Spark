@@ -30,6 +30,7 @@ final class MapViewModel: NSObject, @preconcurrency CLLocationManagerDelegate {
     private(set) var isLoading = false
     private(set) var errorMessage: String?
     private(set) var locationDenied = false
+    private(set) var locationError: String?
     private var visibleMapRect: MKMapRect?
 
     @ObservationIgnored
@@ -89,6 +90,7 @@ final class MapViewModel: NSObject, @preconcurrency CLLocationManagerDelegate {
     }
 
     func requestLocation() {
+        locationError = nil
         checkLocationAvailability()
     }
 
@@ -138,7 +140,17 @@ final class MapViewModel: NSObject, @preconcurrency CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         locationDenied = manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted
         if manager.authorizationStatus == .authorizedWhenInUse || manager.authorizationStatus == .authorizedAlways {
+            locationError = nil
             manager.requestLocation()
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        if let locationError = error as? CLError, locationError.code == .denied {
+            locationDenied = true
+            self.locationError = nil
+        } else {
+            locationError = "Не удалось определить местоположение. Можно продолжить пользоваться картой."
         }
     }
 
@@ -149,6 +161,8 @@ final class MapViewModel: NSObject, @preconcurrency CLLocationManagerDelegate {
         guard let location = locations.first else {
             return
         }
+
+        locationError = nil
 
         cameraPosition = .region(
             MKCoordinateRegion(

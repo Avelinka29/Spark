@@ -64,6 +64,15 @@ struct MapView: View {
                         .padding(10)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
                         .padding(.horizontal, 20)
+                } else if let locationError = model.locationError {
+                    HStack {
+                        Text(locationError)
+                        Button("Повторить") { model.requestLocation() }
+                    }
+                    .font(.footnote)
+                    .padding(10)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 20)
                 }
 
                 Spacer()
