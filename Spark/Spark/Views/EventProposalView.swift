@@ -13,6 +13,8 @@ struct EventProposalView: View {
     @State private var latitude = "53.9023"
     @State private var longitude = "27.5619"
     @State private var message = ""
+    @State private var sourceURL = ""
+    @State private var registrationURL = ""
     @State private var isSending = false
     @State private var errorMessage: String?
 
@@ -29,6 +31,10 @@ struct EventProposalView: View {
                     TextField("Краткое описание", text: $summary, axis: .vertical)
                     TextField("Полное описание", text: $details, axis: .vertical)
                         .lineLimit(3...8)
+                    TextField("Ссылка на источник (https://)", text: $sourceURL)
+                        .textInputAutocapitalization(.never).keyboardType(.URL).autocorrectionDisabled()
+                    TextField("Внешняя регистрация (https://)", text: $registrationURL)
+                        .textInputAutocapitalization(.never).keyboardType(.URL).autocorrectionDisabled()
                 }
 
                 Section("Место на карте") {
@@ -80,7 +86,17 @@ struct EventProposalView: View {
             return
         }
 
-        let event = OpportunityCreateRequest(
+        let source = sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let registration = registrationURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !source.isEmpty, (URL(string: source)?.scheme != "https" || URL(string: source)?.host == nil) {
+            errorMessage = "Укажите корректную ссылку на источник с https://."
+            return
+        }
+        if !registration.isEmpty, (URL(string: registration)?.scheme != "https" || URL(string: registration)?.host == nil) {
+            errorMessage = "Укажите корректную ссылку на регистрацию с https://."
+            return
+        }
+        var event = OpportunityCreateRequest(
             category: category.rawValue,
             title: cleanTitle,
             summary: cleanSummary,
@@ -94,6 +110,8 @@ struct EventProposalView: View {
             deadline: nil,
             reward: nil
         )
+        event.sourceURL = source.isEmpty ? nil : source
+        event.registrationURL = registration.isEmpty ? nil : registration
         Task {
             isSending = true
             if await onSend(event, cleanMessage) {

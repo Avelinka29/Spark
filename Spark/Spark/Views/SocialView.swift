@@ -8,6 +8,7 @@ struct SocialView: View {
     let currentUserID: UUID?
     let onSignIn: () -> Void
 
+    @State private var showProfileCode = false
     @State private var showScanner = false
     @State private var showManualEntry = false
     @State private var profileLink = ""
@@ -18,74 +19,86 @@ struct SocialView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-            if store.isAuthenticated {
             ScrollView {
-                LazyVStack(spacing: 20) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Твои люди — рядом")
-                            .font(.title3.bold())
-                        Text("Знакомься, объединяйся в команды и создавай проекты")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Button {
-                        showUsernameSearch = true
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundStyle(.primaryLitePurple)
-                            Text("Найти друга по нику")
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            Image(systemName: "arrow.right").foregroundStyle(.secondary)
+                LazyVStack(alignment: .leading, spacing: 20) {
+                    if store.isAuthenticated {
+                        VStack(alignment: .leading, spacing: 14) {
+                            Text("Найти друзей")
+                                .font(.title2.bold())
+                            Button {
+                                showUsernameSearch = true
+                            } label: {
+                                HStack {
+                                    Label("Найти друга по нику", systemImage: "magnifyingglass")
+                                    Spacer()
+                                    Image(systemName: "arrow.right").accessibilityHidden(true)
+                                }
+                                .font(.subheadline.weight(.semibold))
+                                .padding(14)
+                                .foregroundStyle(Color(red: 0.16, green: 0.13, blue: 0.35))
+                                .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .font(.subheadline.weight(.semibold))
-                        .padding(16)
-                        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
-                    }
-                    if let currentUserID {
-                        ProfileShareCard(
-                            profileID: currentUserID,
-                            onScan: { showScanner = true },
-                            onEnterLink: { showManualEntry = true },
-                            onViewProfile: { selectedProfile = ScannedProfile(id: currentUserID) }
-                        )
-                    }
+                        .sparkHero()
 
-                    if !store.incomingRequests.isEmpty {
-                        IncomingRequestsSection(
-                            requests: store.incomingRequests,
-                            onAccept: { request in
-                                Task { await store.acceptFriendship(request) }
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 10) { profileActions }
+                            VStack(spacing: 10) { profileActions }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .tint(.primaryLitePurple)
+
+                        if !store.incomingRequests.isEmpty {
+                            IncomingRequestsSection(
+                                requests: store.incomingRequests,
+                                onAccept: { request in
+                                    Task { await store.acceptFriendship(request) }
+                                },
+                                onDecline: { request in
+                                    Task { await store.removeFriendship(request) }
+                                }
+                            )
+                        }
+
+                        FriendsSection(
+                            friends: store.acceptedFriends,
+                            onOpen: { friend in
+                                selectedProfile = ScannedProfile(id: friend.userID)
                             },
-                            onDecline: { request in
-                                Task { await store.removeFriendship(request) }
+                            onRemove: { friend in
+                                Task { await store.removeFriendship(friend) }
                             }
                         )
+
+                        ChatsSection(chats: store.chats, store: store, currentUserID: currentUserID)
+                    } else {
+                        GuestCommunityView(onSignIn: onSignIn)
                     }
-
-                    FriendsSection(
-                        friends: store.acceptedFriends,
-                        onOpen: { friend in
-                            selectedProfile = ScannedProfile(id: friend.userID)
-                        },
-                        onRemove: { friend in
-                            Task { await store.removeFriendship(friend) }
-                        }
-                    )
-
-                    ChatsSection(chats: store.chats, store: store, currentUserID: currentUserID)
                 }
-                .padding()
-            }
-            } else {
-                GuestCommunityView(onSignIn: onSignIn)
-            }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Сообщество")
+            .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showProfileCode) {
+                if let currentUserID {
+                    NavigationStack {
+                        ScrollView {
+                            ProfileShareCard(profileID: currentUserID)
+                                .padding(20)
+                        }
+                        .background(Color(.systemGroupedBackground))
+                        .navigationTitle("Мой QR-код")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            Button("Готово") { showProfileCode = false }
+                        }
+                    }
+                }
+            }
             .overlay {
                 if store.isLoading && store.friends.isEmpty && store.chats.isEmpty {
                     ProgressView()
@@ -153,29 +166,56 @@ struct SocialView: View {
             }
         }
     }
+
+    @ViewBuilder
+    private var profileActions: some View {
+        if let currentUserID {
+            Button {
+                showProfileCode = true
+            } label: {
+                Label("Мой QR-код", systemImage: "qrcode")
+                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(maxWidth: .infinity)
+            }
+            Menu {
+                Button("Сканировать QR-код", systemImage: "qrcode.viewfinder") { showScanner = true }
+                Button("Ввести ссылку", systemImage: "link") { showManualEntry = true }
+                Button("Открыть мой профиль", systemImage: "person.crop.circle") {
+                    selectedProfile = ScannedProfile(id: currentUserID)
+                }
+            } label: {
+                Label("Открыть профиль", systemImage: "person.crop.circle")
+                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
 }
 
 private struct GuestCommunityView: View {
     let onSignIn: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "person.2.circle")
-                .font(.system(size: 56))
-                .foregroundStyle(.primaryLitePurple)
-            Text("Сообщество ждёт тебя")
-                .font(.title3.bold())
-            Text("Войди или создай аккаунт, чтобы находить друзей, делиться своим QR-кодом и общаться с командой.")
+        VStack(alignment: .leading, spacing: 16) {
+            Image(systemName: "person.2.fill")
+                .font(.title)
+                .accessibilityHidden(true)
+            Text("Друзья и проектные чаты")
+                .font(.title2.bold())
+            Text("Войди, чтобы найти друзей по нику или QR-коду и общаться со своей командой.")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button("Войти или зарегистрироваться", action: onSignIn)
-                .buttonStyle(.borderedProminent)
-                .tint(.primaryLitePurple)
-                .padding(.top, 4)
+                .foregroundStyle(.white.opacity(0.88))
+            Button(action: onSignIn) {
+                Text("Войти или зарегистрироваться")
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(13)
+                    .foregroundStyle(Color(red: 0.16, green: 0.13, blue: 0.35))
+                    .background(.white, in: RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
         }
-        .padding(28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sparkHero()
     }
 }
 
@@ -185,10 +225,6 @@ private struct ScannedProfile: Identifiable {
 
 private struct ProfileShareCard: View {
     let profileID: UUID
-    let onScan: () -> Void
-    let onEnterLink: () -> Void
-    let onViewProfile: () -> Void
-
     private var profileURL: URL {
         URL(string: "spark://profile/\(profileID.uuidString)")!
     }
@@ -221,44 +257,15 @@ private struct ProfileShareCard: View {
                     .accessibilityLabel("QR-код профиля")
             }
 
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) {
-                    ShareLink(item: profileURL) {
-                        Label("Поделиться", systemImage: "square.and.arrow.up")
-                            .fixedSize(horizontal: true, vertical: false)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Button(action: onScan) {
-                        Label("Сканировать", systemImage: "qrcode.viewfinder")
-                            .fixedSize(horizontal: true, vertical: false)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                }
-                VStack(spacing: 10) {
-                ShareLink(item: profileURL) {
-                    Label("Поделиться", systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                Button(action: onScan) {
-                    Label("Сканировать", systemImage: "qrcode.viewfinder")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                }
+            ShareLink(item: profileURL) {
+                Label("Поделиться ссылкой", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             .tint(.primaryLitePurple)
-            .controlSize(.regular)
-
-            Button("Ввести ссылку вручную", action: onEnterLink)
-                .font(.footnote)
-            Button("Открыть мой профиль", action: onViewProfile)
-                .font(.footnote)
         }
-        .padding(20)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24))
+        .sparkCard(padding: 20)
     }
 }
 
@@ -308,10 +315,10 @@ private struct FriendsSection: View {
                 .font(.title3.bold())
 
             if friends.isEmpty {
-                ContentUnavailableView(
-                    "Пока нет друзей",
-                    systemImage: "person.2",
-                    description: Text("Поделитесь QR-кодом или отсканируйте профиль друга.")
+                SparkEmptyRow(
+                    title: "Пока нет друзей",
+                    detail: "Найди друга по нику или поделись своим QR-кодом.",
+                    symbol: "person.2"
                 )
             } else {
                 ForEach(friends) { friend in
@@ -319,9 +326,7 @@ private struct FriendsSection: View {
                         onOpen(friend)
                     } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: "person.crop.circle.fill")
-                                .font(.largeTitle)
-                                .foregroundStyle(.primaryLitePurple)
+                            SparkTileIcon(symbol: "person.fill")
                             VStack(alignment: .leading) {
                                 Text(friend.name)
                                     .font(.headline)
@@ -336,8 +341,7 @@ private struct FriendsSection: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .padding(14)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 18))
+                    .sparkCard()
                     .contextMenu {
                         Button("Удалить из друзей", role: .destructive) {
                             onRemove(friend)
@@ -361,10 +365,10 @@ private struct ChatsSection: View {
                 .font(.title3.bold())
 
             if chats.isEmpty {
-                ContentUnavailableView(
-                    "Чатов пока нет",
-                    systemImage: "bubble.left.and.bubble.right",
-                    description: Text("Чат появится автоматически, когда все роли проекта будут заняты.")
+                SparkEmptyRow(
+                    title: "Чатов пока нет",
+                    detail: "Чат появится, когда все роли в твоём проекте будут заняты.",
+                    symbol: "bubble.left.and.bubble.right"
                 )
             } else {
                 ForEach(chats) { chat in
@@ -372,9 +376,7 @@ private struct ChatsSection: View {
                         ProjectChatView(chat: chat, store: store, currentUserID: currentUserID)
                     } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: "bubble.left.and.bubble.right.fill")
-                                .font(.title2)
-                                .foregroundStyle(.primaryLitePurple)
+                            SparkTileIcon(symbol: "bubble.left.and.bubble.right.fill")
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(chat.projectTitle)
                                     .font(.headline)
@@ -388,8 +390,7 @@ private struct ChatsSection: View {
                             Image(systemName: "chevron.right")
                                 .foregroundStyle(.secondary)
                         }
-                        .padding(14)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 18))
+                        .sparkCard()
                     }
                 }
             }
@@ -404,6 +405,7 @@ private struct PublicProfileView: View {
     let profileID: UUID
     let currentUserID: UUID?
     let store: SocialStore
+    @State private var showReport = false
 
     var body: some View {
         NavigationStack {
@@ -431,6 +433,10 @@ private struct PublicProfileView: View {
                         ProfileTagCloud(title: "Навыки", values: profile.skills)
                         ProfileTagCloud(title: "Интересы", values: profile.interests)
 
+                        if !profile.portfolioVisible {
+                            Text("Пользователь скрыл портфолио.").font(.footnote).foregroundStyle(.secondary)
+                        }
+
                         if !profile.projects.isEmpty {
                             VStack(alignment: .leading, spacing: 10) {
                                 Text("Проекты").font(.headline)
@@ -438,6 +444,9 @@ private struct PublicProfileView: View {
                                     VStack(alignment: .leading) {
                                         Text(project.title).font(.subheadline.bold())
                                         Text(project.role).font(.caption).foregroundStyle(.secondary)
+                                        if let value = project.resultURL, let url = URL(string: value), url.scheme == "https" {
+                                            Link("Результат проекта", destination: url).font(.caption)
+                                        }
                                     }
                                 }
                             }.frame(maxWidth: .infinity, alignment: .leading)
@@ -445,15 +454,21 @@ private struct PublicProfileView: View {
                         if !profile.events.isEmpty {
                             VStack(alignment: .leading, spacing: 10) {
                                 Text("Мероприятия").font(.headline)
-                                Text("Участие указано пользователем и не подтверждено организатором.")
-                                    .font(.caption).foregroundStyle(.secondary)
                                 ForEach(profile.events) { event in
-                                    Label(event.title, systemImage: "calendar")
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Label(event.title, systemImage: "calendar")
+                                        Text(event.verified ? "Подтверждено организатором" : "Отмечено самостоятельно")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
                                 }
                             }.frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         friendshipAction(profile)
+                        if profile.id != currentUserID, store.reportToken != nil {
+                            Button("Пожаловаться на профиль") { showReport = true }
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
                     }
                     .padding(24)
                 } else {
@@ -470,6 +485,9 @@ private struct PublicProfileView: View {
             }
             .task {
                 await store.loadProfile(id: profileID)
+            }
+            .sheet(isPresented: $showReport) {
+                if let token = store.reportToken { ContentReportView(token: token, kind: "user", targetID: profileID) }
             }
         }
     }

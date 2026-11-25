@@ -9,6 +9,7 @@ struct Project: Identifiable, Equatable, Codable {
     var ownerRole: String
     var vacancies: [Vacancy]
     var memberCount: Int
+    var resultURL: String?
 
     init(
         id: UUID = UUID(),
@@ -18,7 +19,8 @@ struct Project: Identifiable, Equatable, Codable {
         summary: String,
         ownerRole: String,
         vacancies: [Vacancy],
-        memberCount: Int = 1
+        memberCount: Int = 1,
+        resultURL: String? = nil
     ) {
         self.id = id
         self.ownerID = ownerID
@@ -28,5 +30,6 @@ struct Project: Identifiable, Equatable, Codable {
         self.ownerRole = ownerRole
         self.vacancies = vacancies
         self.memberCount = memberCount
+        self.resultURL = resultURL
     }
 }

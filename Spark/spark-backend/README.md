@@ -34,12 +34,63 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/011_opportunity_attendance.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/012_team_workspace.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/013_usernames.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/014_follows.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/015_recommendation_feedback.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/016_attendance_verification.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/017_opportunity_sources.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/018_content_reports.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/019_portfolio_visibility.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/020_project_result_url.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/021_event_registration.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/022_organization_follows.sql
 ```
 
 For older databases, inspect the schema and apply the missing numbered SQL files in
 order first. These scripts are not an automatic migration system. Fresh databases
 already receive the current schema from `001_initial.sql`; do not rerun seed data
 on an existing database without reviewing it.
+
+### Follows and personalized feed
+
+Apply `sql/014_follows.sql` to existing databases before starting the updated API.
+Authenticated users can follow topics, organizers and projects. Topic matching
+uses case-insensitive literal matches in event category, title and summary;
+organizers match by name, not by a verified organization account. The feed hides
+events whose known dates and deadlines are all past, and includes followed
+projects. Follows are private and removed with the account; project follows are
+removed when the project is deleted. This version does not send push notifications.
+The organization directory also supports following a verified organization by
+its stable account ID; those matches use event ownership rather than names.
+
+For participation verification apply `sql/016_attendance_verification.sql` first.
+Only the approved organization or administrator that owns the event can verify
+another user's self-reported participation after the event starts. The organizer
+can revoke confirmation. A self-reported event is distinct from a verified one;
+seeded events without an owning organization cannot be verified this way.
+
+Event authors may provide an HTTPS source URL; it is displayed as a link, not as
+proof that the information has been independently verified. Existing events may
+have no source. The Space Media calendar integration is not enabled: access or an
+official feed/API must be agreed before importing and refreshing its content.
+
+Authenticated users may report a profile, project or event. Administrators can
+review or dismiss reports; those statuses do not automatically remove content or
+block accounts. Users can hide project and event portfolio entries from other
+users; other profile information and existing friend event plans remain visible
+according to their existing rules. Blocking and comprehensive moderation tools
+are not implemented yet and are required before public launch.
+Project owners can add or remove an HTTPS result link, which appears in project
+details and in the portfolios of the owner and accepted participants when those
+portfolios are visible. The link is supplied by the owner and is not verified.
+
+The directory lists approved, verified organization accounts and their published
+events, including past events. The event owner can optionally enable registrations
+in Spark or provide an HTTPS external registration URL. The in-app form prefills
+the user's profile name and email, lets them edit both, and explicitly asks for
+submission to the organizer. Only that event's approved owner can retrieve the
+registration list; users can cancel their own registration. This is a submitted
+application, not a confirmation of acceptance. Before production, review retention,
+moderation, consent wording and personal-data protection with the organization.
 
 For the current local database, apply `sql/013_usernames.sql` before restarting the
 updated API. Existing users can choose a username in their profile. Friend search
@@ -96,8 +147,12 @@ The ProjectHub AI button is opt-in. The backend can call a self-hosted Ollama
 interests and at most 12 open project descriptions, but not the user's name or email.
 These fields and project descriptions may still contain personal information. It
 does not send data until the user confirms the action in the app. Model output is
-untrusted: the API accepts only candidate project IDs and the app warns that model
-explanations may be wrong. Exact-match recommendations continue to work if AI is off.
+untrusted: the API accepts only candidate project IDs, discards the model's
+explanations and builds reasons from literal matches with profile skills, interests
+and open roles. Candidates without such evidence are excluded; this conservative
+check can miss relevant synonyms. Exact-match recommendations continue to work if AI is off.
+Users can record whether an AI match was helpful; feedback is stored per user and
+project but does not yet change recommendation ranking.
 
 To try locally, install and run Ollama separately and choose a multilingual model
 appropriate for the machine, for example `ollama pull qwen2.5:1.5b`. This downloads

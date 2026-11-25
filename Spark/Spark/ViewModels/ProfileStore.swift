@@ -16,6 +16,7 @@ final class ProfileStore {
     private let token: String?
 
     var isAuthenticated: Bool { token != nil }
+    var reportToken: String? { token }
 
     init(token: String?) {
         self.token = token
@@ -98,6 +99,16 @@ final class ProfileStore {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    func setPortfolioVisibility(_ visible: Bool) async -> Bool {
+        guard let token else { return false }
+        do {
+            let _: ProfileDTO = try await APIClient.shared.send(path: "profile/portfolio-visibility", method: "PUT",
+                body: PortfolioVisibilityRequest(portfolioPublic: visible), token: token)
+            await load()
+            return true
+        } catch { errorMessage = error.localizedDescription; return false }
     }
 
     func updateProfile(

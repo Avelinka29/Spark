@@ -19,6 +19,10 @@ struct RegisterRequest: Encodable {
 }
 
 struct UsernameRequest: Encodable { let username: String }
+struct PortfolioVisibilityRequest: Encodable {
+    let portfolioPublic: Bool
+    enum CodingKeys: String, CodingKey { case portfolioPublic = "portfolio_public" }
+}
 struct UsernameLookup: Decodable { let id: UUID; let name: String; let username: String }
 
 struct EmailRequest: Encodable {
@@ -84,6 +88,10 @@ struct OpportunityDTO: Decodable {
     let summary: String
     let details: String
     let organizer: String
+    let sourceURL: String?
+    let registrationURL: String?
+    let acceptsRegistrations: Bool?
+    let ownerID: UUID?
     let imageURL: String?
     let locationName: String
     let latitude: Double?
@@ -96,6 +104,10 @@ struct OpportunityDTO: Decodable {
     enum CodingKeys: String, CodingKey {
         case id, category, title, summary, details, organizer
         case imageURL = "image_url"
+        case sourceURL = "source_url"
+        case registrationURL = "registration_url"
+        case acceptsRegistrations = "accepts_registrations"
+        case ownerID = "owner_id"
         case locationName = "location_name"
         case latitude, longitude
         case startsAt = "starts_at"
@@ -143,6 +155,8 @@ struct OpportunityDTO: Decodable {
             organizer: organizer,
             latitude: latitude,
             longitude: longitude
+            , sourceURL: sourceURL, registrationURL: registrationURL,
+            acceptsRegistrations: acceptsRegistrations ?? false, ownerID: ownerID
         )
     }
 }
@@ -164,6 +178,8 @@ struct AIProjectMatchDTO: Decodable, Identifiable {
     let reason: String
 }
 
+struct AIFeedbackRequest: Encodable { let helpful: Bool }
+
 struct ProjectDTO: Codable {
     let id: UUID?
     let ownerID: UUID?
@@ -172,11 +188,13 @@ struct ProjectDTO: Codable {
     let summary: String
     let ownerRole: String
     let roles: [ProjectRoleDTO]
+    var resultURL: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, category, title, summary, roles
         case ownerID = "owner_id"
         case ownerRole = "owner_role"
+        case resultURL = "result_url"
     }
 
     func makeProject() -> Project {
@@ -195,7 +213,7 @@ struct ProjectDTO: Codable {
                     roleDescription: $0.skills,
                     isActive: $0.isOpen ?? true
                 )
-            }
+            }, resultURL: resultURL
         )
     }
 }
@@ -205,10 +223,12 @@ struct ProjectUpdateRequest: Encodable {
     let title: String
     let summary: String
     let ownerRole: String
+    let resultURL: String
 
     enum CodingKeys: String, CodingKey {
         case category, title, summary
         case ownerRole = "owner_role"
+        case resultURL = "result_url"
     }
 }
 
@@ -254,12 +274,14 @@ struct ProfileDTO: Decodable {
     let accountType: String
     let organizationName: String?
     let organizationStatus: String?
+    let portfolioPublic: Bool
 
     enum CodingKeys: String, CodingKey {
         case id, email, name, username, region, bio, skills, interests
         case accountType = "account_type"
         case organizationName = "organization_name"
         case organizationStatus = "organization_status"
+        case portfolioPublic = "portfolio_public"
     }
 
     func makeProfile() -> UserProfile {
@@ -274,7 +296,7 @@ struct ProfileDTO: Decodable {
             accountType: accountType,
             organizationName: organizationName,
             organizationStatus: organizationStatus
-            , username: username
+            , username: username, portfolioPublic: portfolioPublic
         )
     }
 }
@@ -313,7 +335,14 @@ struct AttendingFriendDTO: Decodable, Identifiable {
 struct AttendanceDTO: Decodable {
     let going: Bool
     let attended: Bool
+    let verified: Bool
     let friends: [AttendingFriendDTO]
+}
+
+struct AttendanceParticipantDTO: Decodable, Identifiable {
+    let id: UUID
+    let name: String
+    let verified: Bool
 }
 
 struct TeamTaskDTO: Decodable, Identifiable {
@@ -342,10 +371,16 @@ struct OpportunityCreateRequest: Codable {
     let endsAt: String?
     let deadline: String?
     let reward: Int?
+    var sourceURL: String? = nil
+    var registrationURL: String? = nil
+    var acceptsRegistrations: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
         case category, title, summary, details, latitude, longitude, deadline, reward
         case imageURL = "image_url"
+        case sourceURL = "source_url"
+        case registrationURL = "registration_url"
+        case acceptsRegistrations = "accepts_registrations"
         case locationName = "location_name"
         case startsAt = "starts_at"
         case endsAt = "ends_at"
@@ -395,21 +430,24 @@ struct PublicProfileDTO: Identifiable, Decodable, Equatable {
     let skills: [String]
     let interests: [String]
     let friendshipStatus: String
+    let portfolioVisible: Bool
     let projects: [PortfolioProjectDTO]
     let events: [PortfolioEventDTO]
 
     enum CodingKeys: String, CodingKey {
         case id, name, username, region, bio, skills, interests, projects, events
         case friendshipStatus = "friendship_status"
+        case portfolioVisible = "portfolio_visible"
     }
 }
 
 struct PortfolioEventDTO: Decodable, Identifiable, Equatable {
     let id: UUID
     let title: String
+    let verified: Bool
     let startsAt: String?
     enum CodingKeys: String, CodingKey {
-        case id, title
+        case id, title, verified
         case startsAt = "starts_at"
     }
 }
@@ -419,11 +457,13 @@ struct PortfolioProjectDTO: Decodable, Identifiable, Equatable {
     let title: String
     let role: String
     let roleID: UUID?
+    let resultURL: String?
     var id: String { roleID?.uuidString ?? projectID.uuidString }
 
     enum CodingKeys: String, CodingKey {
         case projectID = "id"
         case roleID = "role_id"
+        case resultURL = "result_url"
         case title, role
     }
 }

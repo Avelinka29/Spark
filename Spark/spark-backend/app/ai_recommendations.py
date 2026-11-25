@@ -1,6 +1,7 @@
 """Optional Ollama-powered project ranking; never trusts model-supplied project IDs."""
 
 import json
+import re
 import uuid
 
 import httpx
@@ -20,7 +21,7 @@ async def rank_projects(base_url: str, model: str, skills: list[str], interests:
                         projects: list[dict], *, transport: httpx.AsyncBaseTransport | None = None) -> list[ModelMatch]:
     if not base_url or not model:
         raise ValueError("AI is not configured")
-    allowed = {uuid.UUID(project["id"]) for project in projects}
+    allowed = {uuid.UUID(project["id"]): project for project in projects}
     if not allowed:
         return []
     prompt = json.dumps({"skills": skills[:12], "interests": interests[:12], "projects": projects}, ensure_ascii=False)
@@ -41,7 +42,29 @@ async def rank_projects(base_url: str, model: str, skills: list[str], interests:
     seen: set[uuid.UUID] = set()
     matches = []
     for match in result.matches:
-        if match.id in allowed and match.id not in seen and match.reason.strip():
+        reason = verified_reason(allowed[match.id], skills, interests) if match.id in allowed else None
+        if reason and match.id not in seen:
             seen.add(match.id)
-            matches.append(match)
+            matches.append(ModelMatch(id=match.id, reason=reason))
     return matches
+
+
+def verified_reason(project: dict, skills: list[str], interests: list[str]) -> str | None:
+    """Build explanations only from literal profile and candidate data, not model output."""
+    reasons = []
+    for role in project.get("roles", []):
+        role_skills = role.get("skills", "")
+        for skill in skills:
+            value = skill.strip()
+            if value and re.search(r"(?<!\w)" + re.escape(value) + r"(?!\w)", role_skills, re.IGNORECASE):
+                reasons.append(f"Навык {value} указан для роли «{role.get('title', 'участник')}».")
+                break
+        if reasons:
+            break
+    project_text = " ".join(str(project.get(key, "")) for key in ("category", "title", "summary"))
+    for interest in interests:
+        value = interest.strip()
+        if value and re.search(r"(?<!\w)" + re.escape(value) + r"(?!\w)", project_text, re.IGNORECASE):
+            reasons.append(f"Тема проекта совпадает с интересом «{value}».")
+            break
+    return " ".join(reasons) or None

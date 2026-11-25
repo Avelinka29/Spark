@@ -37,7 +37,7 @@ struct ProfileView: View {
                         ContentUnavailableView(
                             "Профиль недоступен",
                             systemImage: "person.crop.circle.badge.exclamationmark",
-                            description: Text(store.errorMessage ?? "Не удалось загрузить данны.")
+                            description: Text(store.errorMessage ?? "Не удалось загрузить данные.")
                         )
 
                         Button("Повторить") {
@@ -84,49 +84,81 @@ private struct ProfileContent: View {
     @State private var showEventProposal = false
     @State private var showAdminProposals = false
     @State private var showOrganizationApplications = false
+    @State private var showReports = false
     @State private var showUsernameEditor = false
     @State private var username = ""
     @State private var usernameError: String?
+    @State private var visibilityError: String?
+    @State private var savingVisibility = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
                 ProfileHeader(
+                    profile: profile,
                     avatarImage: avatarImage,
                     canEditAvatar: canEditAvatar,
                     onAvatarSelected: onAvatarSelected,
-                    onSettings: { showSettings = true }
-                )
-
-                ProfileIdentitySection(
-                    name: profile.name,
-                    region: profile.region,
-                    bio: profile.bio
-                )
-                .padding(.top, 32)
-
-                if canEditAvatar {
-                    Button {
+                    onSettings: { showSettings = true },
+                    onEdit: { showProfileEditor = true },
+                    onEditUsername: {
                         username = profile.username ?? ""
                         showUsernameEditor = true
-                    } label: {
-                        Text(profile.username.map { "@\($0)" } ?? "Добавить ник для поиска")
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                            .background(Color.primaryLitePurple.opacity(0.10), in: Capsule())
                     }
-                    .font(.subheadline.weight(.medium))
-                    .tint(.primaryLitePurple)
-                    Button {
-                        showProfileEditor = true
-                    } label: {
-                        Label("Редактировать профиль", systemImage: "pencil")
-                            .frame(maxWidth: .infinity)
+                )
+
+                ProfileTagsSection(title: "Навыки", tags: profile.skills)
+                ProfileTagsSection(title: "Интересы", tags: profile.interests)
+                if canEditAvatar {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Label("Моё портфолио", systemImage: "sparkles")
+                            .font(.title3.bold())
+                        Toggle("Показывать другим пользователям", isOn: Binding(
+                            get: { profile.portfolioPublic },
+                            set: { visible in
+                                Task {
+                                    savingVisibility = true
+                                    if !(await store.setPortfolioVisibility(visible)) { visibilityError = store.errorMessage }
+                                    savingVisibility = false
+                                }
+                            }
+                        )).disabled(savingVisibility)
+                        Text("Скрывает проекты и мероприятия в твоём публичном профиле. Имя, ник и остальная информация профиля остаются видимыми.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        if let error = store.portfolioError {
+                            Text(error).font(.footnote).foregroundStyle(.secondary)
+                        } else if let portfolio = store.portfolio {
+                            if portfolio.events.isEmpty && portfolio.projects.isEmpty {
+                                Text("Здесь появятся ваши проекты и посещённые события.")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            ForEach(portfolio.events) { event in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Label(event.title, systemImage: "calendar")
+                                    Text(event.verified ? "Подтверждено организатором" : "Отмечено самостоятельно")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }.frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            ForEach(portfolio.projects) { project in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Label("\(project.title) · \(project.role)", systemImage: "person.3")
+                                    if let value = project.resultURL, let url = URL(string: value), url.scheme == "https" {
+                                        Link("Результат проекта", destination: url).font(.caption)
+                                    }
+                                }.frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        } else {
+                            ProgressView()
+                        }
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.primaryLitePurple)
-                    .padding(.horizontal, 24)
+                    .sparkCard()
                 }
+                AchievementSection(
+                    achievements: profile.achievements,
+                    canEdit: canEditAvatar,
+                    onAdd: { showAchievementForm = true },
+                    onDelete: onDeleteAchievement
+                )
 
                 OrganizationActionsSection(
                     accountType: profile.accountType,
@@ -138,48 +170,13 @@ private struct ProfileContent: View {
                     onReviewProposals: { showAdminProposals = true },
                     onReviewOrganizations: { showOrganizationApplications = true }
                 )
-
-                ProfileTagsSection(title: "Навыки", tags: profile.skills)
-                ProfileTagsSection(title: "Интересы", tags: profile.interests)
-                if canEditAvatar {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label("Моё портфолио", systemImage: "sparkles")
-                            .font(.title3.bold())
-                        if let error = store.portfolioError {
-                            Text(error).font(.footnote).foregroundStyle(.secondary)
-                        } else if let portfolio = store.portfolio {
-                            if portfolio.events.isEmpty && portfolio.projects.isEmpty {
-                                Text("Здесь появятся ваши проекты и посещённые события.")
-                                    .font(.subheadline).foregroundStyle(.secondary)
-                            }
-                            ForEach(portfolio.events) { event in
-                                Label(event.title, systemImage: "calendar.badge.checkmark")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            ForEach(portfolio.projects) { project in
-                                Label("\(project.title) · \(project.role)", systemImage: "person.3")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            if !portfolio.events.isEmpty {
-                                Text("Участие отмечено вами и пока не подтверждено организатором.")
-                                    .font(.footnote).foregroundStyle(.secondary)
-                            }
-                        } else {
-                            ProgressView()
-                        }
-                    }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
-                    .padding(.horizontal, 24)
+                if profile.accountType == "admin", store.reportToken != nil {
+                    Button("Рассмотреть жалобы") { showReports = true }
+                        .buttonStyle(.bordered).tint(.primaryLitePurple)
                 }
-                AchievementSection(
-                    achievements: profile.achievements,
-                    canEdit: canEditAvatar,
-                    onAdd: { showAchievementForm = true },
-                    onDelete: onDeleteAchievement
-                )
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
             .padding(.bottom, 32)
         }
         .background(Color(.systemGroupedBackground))
@@ -201,6 +198,9 @@ private struct ProfileContent: View {
         .alert("Не удалось сохранить ник", isPresented: Binding(get: { usernameError != nil }, set: { if !$0 { usernameError = nil } })) {
             Button("Понятно", role: .cancel) {}
         } message: { Text(usernameError ?? "") }
+        .alert("Не удалось изменить видимость", isPresented: Binding(get: { visibilityError != nil }, set: { if !$0 { visibilityError = nil } })) {
+            Button("Понятно", role: .cancel) {}
+        } message: { Text(visibilityError ?? "") }
         .sheet(isPresented: $showSettings) {
             ProfileSettingsView(
                 isBiometricEnabled: isBiometricEnabled,
@@ -243,6 +243,9 @@ private struct ProfileContent: View {
         }
         .sheet(isPresented: $showOrganizationApplications) {
             OrganizationApplicationsView(store: store)
+        }
+        .sheet(isPresented: $showReports) {
+            if let token = store.reportToken { AdminReportsView(token: token) }
         }
         .sheet(isPresented: $showProfileEditor) {
             ProfileEditView(profile: profile) { name, region, bio, skills, interests in
@@ -492,31 +495,6 @@ private struct PrivacySection: View {
     }
 }
 
-private struct ProfileIdentitySection: View {
-    let name: String
-    let region: String
-    let bio: String
-
-    var body: some View {
-        VStack(spacing: 10) {
-            Text(name)
-                .font(.title2.bold())
-
-            if !region.isEmpty {
-                Label(region, systemImage: "mappin.and.ellipse")
-                    .foregroundStyle(.secondary)
-            }
-
-            if !bio.isEmpty {
-                Text(bio)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.horizontal)
-    }
-}
-
 private struct OrganizationActionsSection: View {
     let accountType: String
     let organizationName: String?
@@ -556,6 +534,8 @@ private struct OrganizationActionsSection: View {
                     .buttonStyle(.bordered)
                 }
             } else {
+                Text("Участие в Spark")
+                    .font(.title3.bold())
                 Button(action: onProposeEvent) {
                     Label("Предложить событие", systemImage: "paperplane")
                         .frame(maxWidth: .infinity)
@@ -581,7 +561,7 @@ private struct OrganizationActionsSection: View {
                 }
             }
         }
-        .padding(.horizontal)
+        .sparkCard()
     }
 }
 
@@ -609,7 +589,7 @@ private struct ProfileTagsSection: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal)
+            .sparkCard()
         }
     }
 }
@@ -666,13 +646,11 @@ private struct AchievementSection: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding()
-                    .background(.thinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(.vertical, 6)
                 }
             }
         }
-        .padding(.horizontal)
+        .sparkCard()
     }
 }
 

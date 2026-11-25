@@ -1,81 +1,73 @@
-//
-//  ProfileHeader.swift
-//  Spark
-//
-//  Created by Avelina Maksimchik on 01.08.2026.
-//
-
 import SwiftUI
 
 struct ProfileHeader: View {
+    let profile: UserProfile
     let avatarImage: UIImage?
     let canEditAvatar: Bool
     let onAvatarSelected: (Data) -> Void
     let onSettings: () -> Void
+    let onEdit: () -> Void
+    let onEditUsername: () -> Void
 
     var body: some View {
-        
-        ZStack{
- 
-            ZStack {
-                LinearGradient(
-                    colors: [Color("PrimaryBlue"), Color("PrimaryLitePurple"), Color("PrimaryPurple")],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                ProfileAvatar(
+                    image: avatarImage,
+                    canEdit: canEditAvatar,
+                    onImageSelected: onAvatarSelected
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 28))
-                
-                VStack {
-                    
-                    HStack {
-                        
-                        Spacer()
-                        
-                        Button(action: onSettings) {
-                            ZStack {
-                                
-                                Rectangle()
-                                    .fill(.primaryWhite)
-                                    .opacity(0.4)
-                                    .cornerRadius(30)
-                                    .frame(width: 40, height: 40)
-                                
-                                Image(systemName: "gear")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 22)
-                                    .foregroundStyle(.primaryWhite)
-                            }
-                            
-                        }
-                        .accessibilityLabel("Настройки профиля")
-                    }
-
-                    
+                Spacer()
+                Button(action: onSettings) {
+                    Image(systemName: "gearshape")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 44, height: 44)
+                        .background(.white.opacity(0.16), in: Circle())
                 }
-                .frame(maxHeight: .infinity, alignment: .top)
-                .padding(.top, 18)
-                .padding(.horizontal, 20)
-                
-                
+                .buttonStyle(.plain)
+                .accessibilityLabel("Настройки профиля")
             }
-            
-            ProfileAvatar(
-                image: avatarImage,
-                canEdit: canEditAvatar,
-                onImageSelected: onAvatarSelected
-            )
-   
-        }.frame(height: 145)
-            .padding(.horizontal, 16)
-    }
-}
 
-#Preview {
-    ProfileHeader(
-        avatarImage: nil,
-        canEditAvatar: true,
-        onAvatarSelected: { _ in },
-        onSettings: {}
-    )
+            VStack(alignment: .leading, spacing: 6) {
+                Text(profile.name)
+                    .font(.title2.bold())
+                    .accessibilityAddTraits(.isHeader)
+                if !profile.region.isEmpty {
+                    Label(profile.region, systemImage: "mappin")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.88))
+                }
+                if canEditAvatar {
+                    Button(action: onEditUsername) {
+                        Label(
+                            profile.username.map { "@\($0)" } ?? "Добавить ник",
+                            systemImage: "pencil"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.vertical, 5)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if !profile.bio.isEmpty {
+                Text(profile.bio)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.88))
+            }
+
+            if canEditAvatar {
+                Button(action: onEdit) {
+                    Label("Редактировать профиль", systemImage: "person.crop.circle")
+                        .font(.subheadline.bold())
+                        .frame(maxWidth: .infinity)
+                        .padding(13)
+                        .foregroundStyle(Color(red: 0.16, green: 0.13, blue: 0.35))
+                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .sparkHero()
+    }
 }

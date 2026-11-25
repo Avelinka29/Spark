@@ -19,10 +19,22 @@ CREATE TABLE users (
     account_type VARCHAR(24) NOT NULL DEFAULT 'user',
     organization_name VARCHAR(160),
     organization_status VARCHAR(24),
+    portfolio_public BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TYPE authcodepurpose AS ENUM ('verify_email', 'password_reset');
+
+CREATE TABLE content_reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind VARCHAR(20) NOT NULL CHECK (kind IN ('user', 'project', 'opportunity')),
+    target_id UUID NOT NULL,
+    reason VARCHAR(1000) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'dismissed')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX ix_content_reports_reporter_id ON content_reports (reporter_id);
 
 CREATE TABLE auth_codes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,6 +56,9 @@ CREATE TABLE opportunities (
     summary TEXT NOT NULL,
     details TEXT NOT NULL,
     organizer VARCHAR(160) NOT NULL,
+    source_url VARCHAR(2048),
+    registration_url VARCHAR(2048),
+    accepts_registrations BOOLEAN NOT NULL DEFAULT FALSE,
     image_url TEXT,
     location_name VARCHAR(160) NOT NULL,
     latitude DOUBLE PRECISION,
@@ -66,7 +81,28 @@ CREATE TABLE projects (
     title VARCHAR(200) NOT NULL,
     summary TEXT NOT NULL,
     owner_role VARCHAR(120) NOT NULL,
+    result_url VARCHAR(2048),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE follows (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind VARCHAR(20) NOT NULL CHECK (kind IN ('topic', 'organizer', 'organization', 'project')),
+    value VARCHAR(160) NOT NULL,
+    label VARCHAR(160) NOT NULL,
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+    organization_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE (user_id, kind, value)
+);
+CREATE INDEX ix_follows_user_id ON follows (user_id);
+
+CREATE TABLE recommendation_feedback (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    helpful BOOLEAN NOT NULL,
+    UNIQUE (user_id, project_id)
 );
 
 CREATE TABLE project_roles (
@@ -75,6 +111,17 @@ CREATE TABLE project_roles (
     title VARCHAR(120) NOT NULL,
     skills TEXT NOT NULL DEFAULT '',
     is_open BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE event_registrations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    opportunity_id UUID NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+    name VARCHAR(120) NOT NULL,
+    email VARCHAR(320) NOT NULL,
+    message VARCHAR(1000) NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (user_id, opportunity_id)
 );
 
 CREATE TABLE bookmarks (
@@ -89,6 +136,7 @@ CREATE TABLE opportunity_attendance (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     opportunity_id UUID NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
     attended BOOLEAN NOT NULL DEFAULT FALSE,
+    verified_by UUID REFERENCES users(id) ON DELETE SET NULL,
     UNIQUE(user_id, opportunity_id)
 );
 CREATE INDEX ix_opportunity_attendance_user_id ON opportunity_attendance(user_id);
