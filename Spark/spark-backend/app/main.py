@@ -20,6 +20,8 @@ from starlette.concurrency import run_in_threadpool
 from .config import get_settings
 from .ai_recommendations import ModelMatch, rank_projects
 from .database import get_session
+from .models import Follow, RecommendationFeedback, ContentReport, EventRegistration
+from .schemas import FollowCreate, FollowResponse, FollowFeed, RecommendationFeedbackRequest, AttendanceParticipant, ReportCreate, ReportResponse, ReportDecision, PortfolioVisibilityUpdate, EventRegistrationCreate, EventRegistrationResponse, OrganizationSummary, OrganizationDetail
 from .email_service import send_auth_code
 from .models import Achievement, Application, ApplicationStatus, AuthCode, AuthCodePurpose, Bookmark, ChatMember, ChatMessage, EventProposal, Friendship, FriendshipStatus, Notification, Opportunity, OpportunityAttendance, Project, ProjectChat, ProjectRole, TeamTask, TeamWorkspace, User
 from .schemas import (
@@ -312,6 +314,154 @@ async def google_register(
     return TokenResponse(access_token=create_access_token(user.id))
 
 
+@app.post("/api/v1/reports", response_model=ReportResponse, status_code=status.HTTP_201_CREATED)
+async def create_report(payload: ReportCreate, user: User = Depends(current_user),
+                        session: AsyncSession = Depends(get_session)) -> ContentReport:
+    reason = payload.reason.strip()
+    if len(reason) < 5:
+        raise HTTPException(status_code=422, detail="Report reason is too short")
+    model = {"user": User, "project": Project, "opportunity": Opportunity}[payload.kind]
+    target = await session.get(model, payload.target_id)
+    if target is None or (payload.kind == "opportunity" and not target.published):
+        raise HTTPException(status_code=404, detail="Report target not found")
+    if payload.kind == "user" and payload.target_id == user.id:
+        raise HTTPException(status_code=400, detail="Cannot report yourself")
+    report = ContentReport(reporter_id=user.id, kind=payload.kind, target_id=payload.target_id, reason=reason)
+    session.add(report)
+    await session.commit()
+    await session.refresh(report)
+    return report
+
+
+@app.get("/api/v1/admin/reports", response_model=list[ReportResponse])
+async def list_reports(user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> list[ContentReport]:
+    if user.account_type != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    return list((await session.scalars(select(ContentReport).where(ContentReport.status == "pending")
+        .order_by(ContentReport.created_at.desc()).limit(100))).all())
+
+
+@app.patch("/api/v1/admin/reports/{report_id}", response_model=ReportResponse)
+async def decide_report(report_id: uuid.UUID, payload: ReportDecision, user: User = Depends(current_user),
+                        session: AsyncSession = Depends(get_session)) -> ContentReport:
+    if user.account_type != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    report = await session.scalar(select(ContentReport).where(ContentReport.id == report_id).with_for_update())
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if report.status != "pending":
+        raise HTTPException(status_code=409, detail="Report already reviewed")
+    report.status = payload.status
+    await session.commit()
+    await session.refresh(report)
+    return report
+
+
+@app.get("/api/v1/follows", response_model=list[FollowResponse])
+async def list_follows(user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> list[Follow]:
+    return list((await session.scalars(select(Follow).where(Follow.user_id == user.id).order_by(Follow.kind, Follow.label))).all())
+
+
+@app.post("/api/v1/follows", response_model=FollowResponse)
+async def add_follow(payload: FollowCreate, user: User = Depends(current_user),
+                     session: AsyncSession = Depends(get_session)) -> Follow:
+    label = " ".join(payload.value.split())
+    if len(label) < 2:
+        raise HTTPException(status_code=422, detail="Follow value is too short")
+    value = label.lower()
+    project_id = None
+    organization_id = None
+    if payload.kind == "project":
+        try:
+            project_id = uuid.UUID(value)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid project ID")
+        project = await session.get(Project, project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+        value, label = str(project.id), project.title
+    elif payload.kind == "organization":
+        try:
+            organization_id = uuid.UUID(value)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid organization ID")
+        organization = await session.get(User, organization_id)
+        if organization is None or organization.account_type != "organization" or organization.organization_status != "approved" or not organization.email_verified:
+            raise HTTPException(status_code=404, detail="Organization not found")
+        value, label = str(organization.id), organization.organization_name or organization.name
+    elif payload.kind == "organizer":
+        exists = await session.scalar(select(Opportunity.id).where(
+            Opportunity.published.is_(True), func.lower(Opportunity.organizer) == value).limit(1))
+        if exists is None:
+            raise HTTPException(status_code=404, detail="Organizer not found")
+    await session.execute(pg_insert(Follow).values(id=uuid.uuid4(), user_id=user.id, kind=payload.kind,
+        value=value, label=label, project_id=project_id, organization_id=organization_id).on_conflict_do_nothing(index_elements=["user_id", "kind", "value"]))
+    await session.commit()
+    return await session.scalar(select(Follow).where(Follow.user_id == user.id, Follow.kind == payload.kind, Follow.value == value))
+
+
+@app.delete("/api/v1/follows/{follow_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_follow(follow_id: uuid.UUID, user: User = Depends(current_user),
+                        session: AsyncSession = Depends(get_session)) -> None:
+    await session.execute(delete(Follow).where(Follow.id == follow_id, Follow.user_id == user.id))
+    await session.commit()
+
+
+@app.get("/api/v1/follows/feed", response_model=FollowFeed)
+async def followed_feed(user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> FollowFeed:
+    follows = (await session.scalars(select(Follow).where(Follow.user_id == user.id))).all()
+    conditions = []
+    project_ids = []
+    for follow in follows:
+        if follow.kind == "topic":
+            conditions.append(or_(Opportunity.category.icontains(follow.value, autoescape=True),
+                                  Opportunity.title.icontains(follow.value, autoescape=True),
+                                  Opportunity.summary.icontains(follow.value, autoescape=True)))
+        elif follow.kind == "organizer":
+            conditions.append(func.lower(Opportunity.organizer) == follow.value)
+        elif follow.kind == "organization" and follow.organization_id:
+            conditions.append(Opportunity.owner_id == follow.organization_id)
+        elif follow.kind == "project":
+            try:
+                project_ids.append(uuid.UUID(follow.value))
+            except ValueError:
+                continue
+    opportunities = []
+    if conditions:
+        opportunities = list((await session.scalars(select(Opportunity).where(
+            Opportunity.published.is_(True), or_(*conditions),
+            or_(Opportunity.deadline >= date.today(), Opportunity.starts_at >= date.today(),
+                Opportunity.ends_at >= date.today(), and_(Opportunity.deadline.is_(None), Opportunity.starts_at.is_(None), Opportunity.ends_at.is_(None)))
+        ).order_by(Opportunity.deadline.asc().nullslast()).limit(50))).all())
+    projects = []
+    if project_ids:
+        projects = list((await session.scalars(select(Project).options(selectinload(Project.roles))
+            .where(Project.id.in_(project_ids)).order_by(Project.created_at.desc()).limit(50))).unique().all())
+    return FollowFeed(opportunities=[OpportunityResponse.model_validate(item) for item in opportunities],
+                      projects=[ProjectResponse.model_validate(item) for item in projects])
+
+
+@app.get("/api/v1/organizations", response_model=list[OrganizationSummary])
+async def search_organizations(search: str = Query(default="", max_length=100),
+                               session: AsyncSession = Depends(get_session)) -> list[OrganizationSummary]:
+    query = select(User).where(User.account_type == "organization", User.organization_status == "approved", User.email_verified.is_(True))
+    if search.strip():
+        query = query.where(User.organization_name.icontains(search.strip(), autoescape=True))
+    organizations = (await session.scalars(query.order_by(User.organization_name).limit(100))).all()
+    return [OrganizationSummary(id=item.id, name=item.organization_name or item.name, region=item.region, bio=item.bio) for item in organizations]
+
+
+@app.get("/api/v1/organizations/{organization_id}", response_model=OrganizationDetail)
+async def organization_detail(organization_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> OrganizationDetail:
+    organization = await session.get(User, organization_id)
+    if organization is None or organization.account_type != "organization" or organization.organization_status != "approved" or not organization.email_verified:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    events = (await session.scalars(select(Opportunity).where(Opportunity.owner_id == organization_id,
+        Opportunity.published.is_(True)).order_by(Opportunity.starts_at.desc().nullslast()).limit(100))).all()
+    return OrganizationDetail(id=organization.id, name=organization.organization_name or organization.name,
+        region=organization.region, bio=organization.bio, events=[OpportunityResponse.model_validate(event) for event in events])
+
+
 @app.get("/api/v1/opportunities", response_model=list[OpportunityResponse])
 async def list_opportunities(
     search: str | None = Query(default=None, max_length=100),
@@ -360,6 +510,8 @@ async def propose_event(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> EventProposalResponse:
+    if payload.event.accepts_registrations and user.account_type not in {"organization", "admin"}:
+        raise HTTPException(status_code=403, detail="Only approved organizers may collect registrations")
     proposal = EventProposal(
         author_id=user.id,
         event_data=payload.event.model_dump(mode="json"),
@@ -474,7 +626,58 @@ async def attendance_state(opportunity_id: uuid.UUID, user: User = Depends(curre
     ).where(OpportunityAttendance.opportunity_id == opportunity_id, User.id.in_(friend_ids))
         .order_by(User.name))).all()
     return AttendanceResponse(going=attendance is not None, attended=attendance.attended if attendance else False,
+                              verified=attendance.verified_by is not None if attendance else False,
                               friends=[AttendingFriend(id=f.id, name=f.name) for f in friends])
+
+
+@app.get("/api/v1/opportunities/{opportunity_id}/registrations/me", response_model=EventRegistrationResponse | None)
+async def my_registration(opportunity_id: uuid.UUID, user: User = Depends(current_user),
+                          session: AsyncSession = Depends(get_session)) -> EventRegistration | None:
+    return await session.scalar(select(EventRegistration).where(EventRegistration.opportunity_id == opportunity_id,
+                                                                  EventRegistration.user_id == user.id))
+
+
+@app.post("/api/v1/opportunities/{opportunity_id}/registrations", response_model=EventRegistrationResponse, status_code=status.HTTP_201_CREATED)
+async def register_for_event(opportunity_id: uuid.UUID, payload: EventRegistrationCreate, user: User = Depends(current_user),
+                             session: AsyncSession = Depends(get_session)) -> EventRegistration:
+    event = await session.get(Opportunity, opportunity_id)
+    if event is None or not event.published:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    if not event.accepts_registrations or event.owner_id is None:
+        raise HTTPException(status_code=409, detail="Registration is not available")
+    if event.deadline and event.deadline < date.today() or event.ends_at and event.ends_at < date.today():
+        raise HTTPException(status_code=409, detail="Registration is closed")
+    name = payload.name.strip()
+    if len(name) < 2:
+        raise HTTPException(status_code=422, detail="Name is too short")
+    registration = EventRegistration(user_id=user.id, opportunity_id=opportunity_id, name=name,
+                                     email=str(payload.email).lower(), message=payload.message.strip())
+    session.add(registration)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Already registered")
+    await session.refresh(registration)
+    return registration
+
+
+@app.delete("/api/v1/opportunities/{opportunity_id}/registrations/me", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_event_registration(opportunity_id: uuid.UUID, user: User = Depends(current_user),
+                                    session: AsyncSession = Depends(get_session)) -> None:
+    await session.execute(delete(EventRegistration).where(EventRegistration.opportunity_id == opportunity_id,
+                                                           EventRegistration.user_id == user.id))
+    await session.commit()
+
+
+@app.get("/api/v1/opportunities/{opportunity_id}/registrations", response_model=list[EventRegistrationResponse])
+async def event_registrations(opportunity_id: uuid.UUID, user: User = Depends(current_user),
+                              session: AsyncSession = Depends(get_session)) -> list[EventRegistration]:
+    event = await session.get(Opportunity, opportunity_id)
+    if event is None or event.owner_id != user.id or user.account_type not in {"organization", "admin"}:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    return list((await session.scalars(select(EventRegistration).where(EventRegistration.opportunity_id == opportunity_id)
+                 .order_by(EventRegistration.created_at.desc()).limit(500))).all())
 
 
 @app.put("/api/v1/opportunities/{opportunity_id}/attendance", status_code=status.HTTP_204_NO_CONTENT)
@@ -493,6 +696,56 @@ async def unmark_going(opportunity_id: uuid.UUID, user: User = Depends(current_u
                        session: AsyncSession = Depends(get_session)) -> None:
     await session.execute(delete(OpportunityAttendance).where(OpportunityAttendance.user_id == user.id,
         OpportunityAttendance.opportunity_id == opportunity_id))
+    await session.commit()
+
+
+async def require_event_verifier(opportunity_id: uuid.UUID, user: User, session: AsyncSession) -> Opportunity:
+    opportunity = await session.get(Opportunity, opportunity_id)
+    if opportunity is None or not opportunity.published:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    if opportunity.owner_id != user.id or user.account_type not in {"organization", "admin"}:
+        raise HTTPException(status_code=403, detail="Only the verified event organizer can confirm participation")
+    return opportunity
+
+
+@app.get("/api/v1/opportunities/{opportunity_id}/attendance/participants", response_model=list[AttendanceParticipant])
+async def participants_to_verify(opportunity_id: uuid.UUID, user: User = Depends(current_user),
+                                 session: AsyncSession = Depends(get_session)) -> list[AttendanceParticipant]:
+    await require_event_verifier(opportunity_id, user, session)
+    rows = (await session.execute(select(User, OpportunityAttendance).join(
+        OpportunityAttendance, OpportunityAttendance.user_id == User.id).where(
+        OpportunityAttendance.opportunity_id == opportunity_id,
+        OpportunityAttendance.attended.is_(True), User.id != user.id).order_by(User.name))).all()
+    return [AttendanceParticipant(id=person.id, name=person.name, verified=attendance.verified_by is not None)
+            for person, attendance in rows]
+
+
+@app.put("/api/v1/opportunities/{opportunity_id}/attendance/participants/{participant_id}/verify", status_code=status.HTTP_204_NO_CONTENT)
+async def verify_participation(opportunity_id: uuid.UUID, participant_id: uuid.UUID,
+                               user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> None:
+    opportunity = await require_event_verifier(opportunity_id, user, session)
+    if participant_id == user.id:
+        raise HTTPException(status_code=403, detail="You cannot verify your own participation")
+    if opportunity.starts_at is None or opportunity.starts_at > date.today():
+        raise HTTPException(status_code=409, detail="Attendance can be confirmed after the event starts")
+    attendance = await session.scalar(select(OpportunityAttendance).where(
+        OpportunityAttendance.user_id == participant_id, OpportunityAttendance.opportunity_id == opportunity_id,
+        OpportunityAttendance.attended.is_(True)))
+    if attendance is None:
+        raise HTTPException(status_code=404, detail="Participation not found")
+    attendance.verified_by = user.id
+    await session.commit()
+
+
+@app.delete("/api/v1/opportunities/{opportunity_id}/attendance/participants/{participant_id}/verify", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_participation_verification(opportunity_id: uuid.UUID, participant_id: uuid.UUID,
+                                            user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> None:
+    await require_event_verifier(opportunity_id, user, session)
+    attendance = await session.scalar(select(OpportunityAttendance).where(
+        OpportunityAttendance.user_id == participant_id, OpportunityAttendance.opportunity_id == opportunity_id))
+    if attendance is None:
+        raise HTTPException(status_code=404, detail="Participation not found")
+    attendance.verified_by = None
     await session.commit()
 
 
@@ -607,6 +860,18 @@ async def recommend_projects(user: User = Depends(current_user),
         raise HTTPException(status_code=503, detail="AI recommendations temporarily unavailable") from error
 
 
+@app.put("/api/v1/recommendations/projects/{project_id}/feedback", status_code=status.HTTP_204_NO_CONTENT)
+async def recommendation_feedback(project_id: uuid.UUID, payload: RecommendationFeedbackRequest,
+                                  user: User = Depends(current_user), session: AsyncSession = Depends(get_session)) -> None:
+    if await session.get(Project, project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    insert_stmt = pg_insert(RecommendationFeedback).values(id=uuid.uuid4(), user_id=user.id,
+                                                            project_id=project_id, helpful=payload.helpful)
+    await session.execute(insert_stmt.on_conflict_do_update(index_elements=["user_id", "project_id"],
+        set_={"helpful": payload.helpful}))
+    await session.commit()
+
+
 @app.post("/api/v1/projects", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
     payload: ProjectCreate,
@@ -641,7 +906,7 @@ async def update_project(
         raise HTTPException(status_code=403, detail="Only the project owner can edit it")
 
     for field, value in payload.model_dump(exclude_none=True).items():
-        setattr(project, field, value)
+        setattr(project, field, None if field == "result_url" and value == "" else value)
     await session.commit()
     query = select(Project).options(selectinload(Project.roles)).where(Project.id == project.id)
     return (await session.scalars(query)).one()
@@ -942,6 +1207,15 @@ async def update_my_profile(
     return user
 
 
+@app.put("/api/v1/profile/portfolio-visibility", response_model=ProfileResponse)
+async def update_portfolio_visibility(payload: PortfolioVisibilityUpdate, user: User = Depends(current_user),
+                                      session: AsyncSession = Depends(get_session)) -> User:
+    user.portfolio_public = payload.portfolio_public
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
 @app.patch("/api/v1/profile/organization", response_model=ProfileResponse)
 async def enable_organization_profile(
     payload: OrganizationProfileUpdate,
@@ -1055,15 +1329,16 @@ async def public_profile(
     status_value = "self" if profile.id == user.id else friendship_label(
         await friendship_between(user.id, profile.id, session), user.id
     )
+    portfolio_visible = profile.id == user.id or profile.portfolio_public
     memberships = (await session.execute(
-        select(Project.id, Project.title, ProjectRole.title, ProjectRole.id)
+        select(Project.id, Project.title, ProjectRole.title, ProjectRole.id, Project.result_url)
         .join(ProjectRole, ProjectRole.project_id == Project.id)
         .join(Application, Application.project_role_id == ProjectRole.id)
         .where(Application.user_id == profile.id, Application.status == ApplicationStatus.accepted)
     )).all()
-    owned = (await session.execute(select(Project.id, Project.title, Project.owner_role)
+    owned = (await session.execute(select(Project.id, Project.title, Project.owner_role, Project.result_url)
         .where(Project.owner_id == profile.id))).all()
-    attended_events = (await session.scalars(select(Opportunity).join(
+    attended_events = (await session.execute(select(Opportunity, OpportunityAttendance.verified_by).join(
         OpportunityAttendance, OpportunityAttendance.opportunity_id == Opportunity.id
     ).where(OpportunityAttendance.user_id == profile.id, OpportunityAttendance.attended.is_(True),
             Opportunity.published.is_(True)))).all()
@@ -1076,9 +1351,11 @@ async def public_profile(
         skills=profile.skills,
         interests=profile.interests,
         friendship_status=status_value,
-        projects=([PortfolioProject(id=row[0], title=row[1], role=row[2]) for row in owned] +
-                  [PortfolioProject(id=row[0], title=row[1], role=row[2], role_id=row[3]) for row in memberships]),
-        events=[PortfolioEvent(id=event.id, title=event.title, starts_at=event.starts_at) for event in attended_events],
+        portfolio_visible=portfolio_visible,
+        projects=([PortfolioProject(id=row[0], title=row[1], role=row[2], result_url=row[3]) for row in owned] +
+                  [PortfolioProject(id=row[0], title=row[1], role=row[2], role_id=row[3], result_url=row[4]) for row in memberships]) if portfolio_visible else [],
+        events=[PortfolioEvent(id=event.id, title=event.title, starts_at=event.starts_at, verified=verifier is not None)
+                for event, verifier in attended_events] if portfolio_visible else [],
     )
 
 

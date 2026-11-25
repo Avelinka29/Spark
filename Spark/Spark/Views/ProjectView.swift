@@ -17,7 +17,8 @@ struct ProjectView: View {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     ProjectSummary(
                         projectsCount: store.projects.count,
-                        rolesCount: store.openRolesCount
+                        rolesCount: store.openRolesCount,
+                        onCreate: onCreateProject
                     )
 
                     if profile != nil {
@@ -50,6 +51,14 @@ struct ProjectView: View {
                                     } label: {
                                         RecommendationCard(project: project, reasons: [match.reason], symbol: "sparkles")
                                     }.buttonStyle(.plain)
+                                    HStack {
+                                        Text("Подходит?").font(.caption).foregroundStyle(.secondary)
+                                        Button("Да") { Task { await store.sendAIFeedback(projectID: project.id, helpful: true) } }
+                                        Button("Нет") { Task { await store.sendAIFeedback(projectID: project.id, helpful: false) } }
+                                        if store.aiFeedback[project.id] != nil {
+                                            Text("Спасибо за отзыв").font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }.font(.subheadline)
                                 }
                             }
                         }
@@ -85,12 +94,11 @@ struct ProjectView: View {
                     }
 
                     if store.projects.isEmpty && !store.isLoading {
-                        ContentUnavailableView(
-                            "Проектов пока нет",
-                            systemImage: "person.3.sequence",
-                            description: Text("Создай первый проект и собери свою команду.")
+                        SparkEmptyRow(
+                            title: "Проектов пока нет",
+                            detail: "Создай первый проект и собери команду.",
+                            symbol: "person.3"
                         )
-                        .padding(.vertical, 40)
                     } else {
                         ForEach(store.projects) { project in
                             NavigationLink {
@@ -118,16 +126,8 @@ struct ProjectView: View {
                 .padding(.bottom, 32)
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("ProjectHub")
+            .navigationTitle("Проекты")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: onCreateProject) {
-                        Image(systemName: "plus")
-                    }
-                    .accessibilityLabel("Создать проект")
-                }
-            }
             .alert("Подбор с ИИ", isPresented: $showAIConfirmation) {
                 Button("Продолжить") { Task { await store.loadAIRecommendations() } }
                 Button("Отмена", role: .cancel) {}
@@ -188,22 +188,47 @@ private struct ProjectSummary: View {
     let projectsCount: Int
     let rolesCount: Int
 
+    let onCreate: () -> Void
+
     var body: some View {
-        HStack(spacing: 12) {
-            summaryItem(value: projectsCount, title: "проектов", symbol: "square.stack.3d.up")
-            summaryItem(value: rolesCount, title: "открытых ролей", symbol: "person.2")
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Найди свою команду")
+                .font(.title2.bold())
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 24) { statistics }
+                VStack(alignment: .leading, spacing: 12) { statistics }
+            }
+
+            Button(action: onCreate) {
+                Label("Создать проект", systemImage: "plus")
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(13)
+                    .foregroundStyle(Color(red: 0.16, green: 0.13, blue: 0.35))
+                    .background(.white, in: RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
         }
+        .sparkHero()
     }
 
-    private func summaryItem(value: Int, title: String, symbol: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Image(systemName: symbol).foregroundStyle(.primaryLitePurple)
-            Text("\(value)").font(.title2.bold())
-            Text(title).font(.caption).foregroundStyle(.secondary)
+    @ViewBuilder
+    private var statistics: some View {
+        statistic("Проекты", value: projectsCount)
+        statistic("Открытые роли", value: rolesCount)
+    }
+
+    private func statistic(_ title: String, value: Int) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value, format: .number)
+                .font(.title2.bold().monospacedDigit())
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.88))
+                .fixedSize(horizontal: true, vertical: false)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -215,6 +240,7 @@ private struct ProjectDetailsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
     @State private var showEditor = false
+    @State private var showReport = false
 
     private var currentProject: Project {
         store.projects.first { $0.id == project.id } ?? project
@@ -235,6 +261,9 @@ private struct ProjectDetailsView: View {
                     Divider().padding(.vertical, 4)
                     Label(currentProject.ownerRole, systemImage: "person.crop.circle")
                     Label("\(currentProject.memberCount) в команде", systemImage: "person.2")
+                    if let value = currentProject.resultURL, let url = URL(string: value), url.scheme == "https" {
+                        Link(destination: url) { Label("Результат проекта", systemImage: "arrow.up.right.square") }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
@@ -282,6 +311,9 @@ private struct ProjectDetailsView: View {
                     Button("Удалить проект", role: .destructive) {
                         showDeleteConfirmation = true
                     }
+                } else if store.reportToken != nil {
+                    Button("Пожаловаться на проект") { showReport = true }
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
             }
             .padding(20)
@@ -299,6 +331,9 @@ private struct ProjectDetailsView: View {
         }
         .sheet(isPresented: $showEditor) {
             ProjectEditorView(project: currentProject, store: store)
+        }
+        .sheet(isPresented: $showReport) {
+            if let token = store.reportToken { ContentReportView(token: token, kind: "project", targetID: project.id) }
         }
         .confirmationDialog(
             "Удалить проект без возможности восстановления?",
@@ -326,6 +361,7 @@ private struct ProjectEditorView: View {
     @State private var title: String
     @State private var summary: String
     @State private var ownerRole: String
+    @State private var resultURL: String
     @State private var newRoleTitle = ""
     @State private var newRoleSkills = ""
     @State private var isSaving = false
@@ -341,6 +377,7 @@ private struct ProjectEditorView: View {
         _title = State(initialValue: project.title)
         _summary = State(initialValue: project.summary)
         _ownerRole = State(initialValue: project.ownerRole)
+        _resultURL = State(initialValue: project.resultURL ?? "")
     }
 
     var body: some View {
@@ -352,6 +389,10 @@ private struct ProjectEditorView: View {
                     TextField("Описание", text: $summary, axis: .vertical)
                         .lineLimit(3...8)
                     TextField("Моя роль", text: $ownerRole)
+                    TextField("Ссылка на результат (https://)", text: $resultURL)
+                        .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    Text("Ссылка будет видна в портфолио участников, если они не скрыли его.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
 
                 Section("Открытые роли") {
@@ -390,6 +431,7 @@ private struct ProjectEditorView: View {
                     }
                     .disabled(newRoleTitle.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
                 }
+                if let error = store.errorMessage { Text(error).foregroundStyle(.red) }
             }
             .navigationTitle("Редактирование")
             .navigationBarTitleDisplayMode(.inline)
@@ -406,7 +448,8 @@ private struct ProjectEditorView: View {
                                 category: category,
                                 title: title,
                                 summary: summary,
-                                ownerRole: ownerRole
+                                ownerRole: ownerRole,
+                                resultURL: resultURL.trimmingCharacters(in: .whitespacesAndNewlines)
                             ) {
                                 dismiss()
                             }

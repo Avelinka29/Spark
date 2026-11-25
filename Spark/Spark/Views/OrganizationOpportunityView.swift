@@ -57,6 +57,9 @@ struct OpportunityCreateView: View {
     @State private var deadline = Date()
     @State private var reward = ""
     @State private var imageURL = ""
+    @State private var sourceURL = ""
+    @State private var registrationURL = ""
+    @State private var acceptsRegistrations = false
     @State private var isSaving = false
     @State private var validationMessage: String?
 
@@ -93,6 +96,15 @@ struct OpportunityCreateView: View {
                 }
 
                 Section("Дополнительно") {
+                    TextField("Ссылка на источник (https://)", text: $sourceURL)
+                        .textInputAutocapitalization(.never).keyboardType(.URL).autocorrectionDisabled()
+                    TextField("Внешняя регистрация (https://)", text: $registrationURL)
+                        .textInputAutocapitalization(.never).keyboardType(.URL).autocorrectionDisabled()
+                    Toggle("Принимать заявки в Spark", isOn: $acceptsRegistrations)
+                    if acceptsRegistrations {
+                        Text("Участники сами подтверждают отправку имени, email и сообщения. Заявки доступны владельцу события.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                     TextField("Ссылка на изображение", text: $imageURL)
                         .textInputAutocapitalization(.never)
                         .keyboardType(.URL)
@@ -138,7 +150,17 @@ struct OpportunityCreateView: View {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
 
-        let request = OpportunityCreateRequest(
+        let source = sourceURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let registration = registrationURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !source.isEmpty, (URL(string: source)?.scheme != "https" || URL(string: source)?.host == nil) {
+            validationMessage = "Укажите корректную ссылку на источник с https://."
+            return
+        }
+        if !registration.isEmpty, (URL(string: registration)?.scheme != "https" || URL(string: registration)?.host == nil) {
+            validationMessage = "Укажите корректную ссылку на регистрацию с https://."
+            return
+        }
+        var request = OpportunityCreateRequest(
             category: category.rawValue,
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -152,6 +174,9 @@ struct OpportunityCreateView: View {
             deadline: formatter.string(from: deadline),
             reward: Int(reward)
         )
+        request.sourceURL = source.isEmpty ? nil : source
+        request.registrationURL = registration.isEmpty ? nil : registration
+        request.acceptsRegistrations = acceptsRegistrations
 
         Task {
             isSaving = true

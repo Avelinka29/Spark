@@ -31,4 +31,5 @@ struct UserProfile: Identifiable, Equatable, Codable {
     var organizationName: String? = nil
     var organizationStatus: String? = nil
     var username: String? = nil
+    var portfolioPublic: Bool = true
 }

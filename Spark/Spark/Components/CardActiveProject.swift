@@ -23,36 +23,38 @@ struct CardActiveProject: View {
     
     
     var body: some View {
-        
-        
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(category)
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(color.color)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(color.color.opacity(0.1), in: Capsule())
-                Spacer()
-                Image(systemName: "arrow.up.right")
-                    .font(.caption.weight(.bold))
+            HStack(spacing: 12) {
+                SparkTileIcon(symbol: "folder.fill")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(category)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
-            Text(title).font(.headline).foregroundStyle(.primary)
-            Text(description)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-            Divider().padding(.vertical, 2)
-            Label("Открытых ролей: \(countOpen)", systemImage: "person.2")
+
+            if !description.isEmpty {
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+            }
+
+            Divider()
+
+            Label(countOpen == 0 ? "Набор закрыт" : "Открытые роли: \(countOpen)", systemImage: "person.2")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(color.color)
+                .foregroundStyle(countOpen == 0 ? Color.secondary : color.color)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .sparkCard()
     }
 }
 

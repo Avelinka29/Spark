@@ -11,11 +11,18 @@ struct OpportunityDetailsView: View {
     @State private var bookmarkFeedbackTrigger = 0
     @State private var isGoing = false
     @State private var hasAttended = false
+    @State private var isVerified = false
+    @State private var participantsToVerify: [AttendanceParticipantDTO]?
+    @State private var verifyingParticipant: UUID?
     @State private var attendanceLoading = false
     @State private var attendingFriends: [AttendingFriendDTO] = []
     @State private var showInvite = false
     @State private var reminderMessage: String?
     @State private var showAuthenticationRequired = false
+    @State private var showReport = false
+    @State private var showRegistration = false
+    @State private var registrations: [EventRegistrationDTO]?
+    @State private var hasOrganizationPage = false
 
     var body: some View {
         ScrollView {
@@ -39,6 +46,36 @@ struct OpportunityDetailsView: View {
                     locationName: opportunity.locationName,
                     organizer: opportunity.organizer
                 )
+                if hasOrganizationPage, let ownerID = opportunity.ownerID {
+                    NavigationLink {
+                        OrganizationDetailsView(id: ownerID, token: accessToken)
+                    } label: { Label("Профиль организации", systemImage: "building.2") }
+                        .padding(.horizontal)
+                }
+
+                if let value = opportunity.sourceURL, let url = URL(string: value), url.scheme == "https" {
+                    Link(destination: url) {
+                        Label("Открыть источник события", systemImage: "arrow.up.right.square")
+                    }.padding(.horizontal)
+                    Text("Ссылку указал автор события; Spark не подтверждает её содержимое.")
+                        .font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
+                } else {
+                    Text("Ссылка на источник не указана")
+                        .font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
+                }
+                if let value = opportunity.registrationURL, let url = URL(string: value), url.scheme == "https" {
+                    Link(destination: url) { Label("Регистрация на сайте организатора", systemImage: "arrow.up.right.square") }
+                        .padding(.horizontal)
+                    Text("Откроется внешний сайт; данные профиля Spark не передаются автоматически.")
+                        .font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
+                }
+                if opportunity.acceptsRegistrations {
+                    Button("Подать заявку в Spark") {
+                        if accessToken == nil { showAuthenticationRequired = true }
+                        else { showRegistration = true }
+                    }.buttonStyle(.borderedProminent).tint(.primaryLitePurple).padding(.horizontal)
+                }
+                if let registrations { EventRegistrationsList(registrations: registrations) }
 
                 Text(opportunity.details)
                     .font(.body)
@@ -90,8 +127,28 @@ struct OpportunityDetailsView: View {
                     }
                     .disabled(hasAttended || attendanceLoading || !hasEventStarted)
                     .padding(.horizontal)
-                    Text(hasEventStarted ? "Участие появится в вашем профиле для пользователей Spark. Организатор его не подтверждал." : "Отметить участие можно с даты начала события.")
+                    Text(isVerified ? "Участие подтверждено организатором." : (hasEventStarted ? "Участие появится в профиле. Пока оно не подтверждено организатором." : "Отметить участие можно с даты начала события."))
                         .font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
+                }
+                if let participants = participantsToVerify {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Подтверждение участников").font(.headline)
+                        Text("Здесь только пользователи, которые сами отметили участие.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        if participants.isEmpty {
+                            Text("Пока нет отметок об участии.").font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        ForEach(participants) { participant in
+                            HStack {
+                                Text(participant.name)
+                                Spacer()
+                                Button(participant.verified ? "Отменить подтверждение" : "Подтвердить") {
+                                    Task { await verifyParticipant(participant.id, revoke: participant.verified) }
+                                }
+                                .disabled(verifyingParticipant != nil)
+                            }
+                        }
+                    }.padding(.horizontal)
                 }
                 if !attendingFriends.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
@@ -109,6 +166,8 @@ struct OpportunityDetailsView: View {
                         Label("Пригласить друга", systemImage: "person.badge.plus")
                     }
                     .padding(.horizontal)
+                    Button("Пожаловаться на событие") { showReport = true }
+                        .font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
                 }
                 if reminderDate != nil {
                     Button {
@@ -128,10 +187,19 @@ struct OpportunityDetailsView: View {
                 InviteFriendView(opportunityID: opportunity.id, token: accessToken)
             }
         }
+        .sheet(isPresented: $showReport) {
+            if let accessToken { ContentReportView(token: accessToken, kind: "opportunity", targetID: opportunity.id) }
+        }
+        .sheet(isPresented: $showRegistration, onDismiss: { Task { await loadRegistrations() } }) {
+            if let accessToken { EventRegistrationView(event: opportunity, token: accessToken) }
+        }
         .sensoryFeedback(.success, trigger: bookmarkFeedbackTrigger)
         .task(id: opportunity.id) {
             await loadBookmarkState()
             await loadAttendance()
+            await loadParticipants()
+            await loadRegistrations()
+            await checkOrganizationPage()
         }
         .alert("Нужна авторизация", isPresented: $showAuthenticationRequired) {
             Button("Понятно", role: .cancel) {}
@@ -153,6 +221,20 @@ struct OpportunityDetailsView: View {
         } message: {
             Text(reminderMessage ?? "")
         }
+    }
+
+    private func checkOrganizationPage() async {
+        guard let ownerID = opportunity.ownerID else { return }
+        do {
+            let _: OrganizationPageCheck = try await APIClient.shared.send(path: "organizations/\(ownerID)")
+            hasOrganizationPage = true
+        } catch { hasOrganizationPage = false }
+    }
+
+    private func loadRegistrations() async {
+        guard let accessToken, opportunity.acceptsRegistrations else { return }
+        do { registrations = try await APIClient.shared.send(path: "opportunities/\(opportunity.id)/registrations", token: accessToken) }
+        catch { registrations = nil }
     }
 
     private var reminderDate: Date? {
@@ -194,10 +276,35 @@ struct OpportunityDetailsView: View {
                 path: "opportunities/\(opportunity.id)/attendance", token: accessToken)
             isGoing = state.going
             hasAttended = state.attended
+            isVerified = state.verified
             attendingFriends = state.friends
         } catch {
             bookmarkError = error.localizedDescription
         }
+    }
+
+    private func loadParticipants() async {
+        guard let accessToken else { return }
+        do {
+            participantsToVerify = try await APIClient.shared.send(
+                path: "opportunities/\(opportunity.id)/attendance/participants", token: accessToken)
+        } catch APIError.server(let statusCode, _) where statusCode == 403 {
+            participantsToVerify = nil
+        } catch {
+            participantsToVerify = nil
+        }
+    }
+
+    private func verifyParticipant(_ participantID: UUID, revoke: Bool) async {
+        guard let accessToken else { return }
+        verifyingParticipant = participantID
+        defer { verifyingParticipant = nil }
+        do {
+            let _: EmptyResponse = try await APIClient.shared.send(
+                path: "opportunities/\(opportunity.id)/attendance/participants/\(participantID)/verify",
+                method: revoke ? "DELETE" : "PUT", token: accessToken)
+            await loadParticipants()
+        } catch { bookmarkError = error.localizedDescription }
     }
 
     private var hasEventStarted: Bool {

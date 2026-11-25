@@ -20,6 +20,10 @@ struct Opportunity: Identifiable {
     let organizer: String
     let latitude: Double?
     let longitude: Double?
+    var sourceURL: String? = nil
+    var registrationURL: String? = nil
+    var acceptsRegistrations: Bool = false
+    var ownerID: UUID? = nil
 
     var coordinate: CLLocationCoordinate2D? {
         guard let latitude, let longitude else {

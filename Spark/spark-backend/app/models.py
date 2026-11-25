@@ -46,6 +46,7 @@ class User(Base):
     account_type: Mapped[str] = mapped_column(String(24), default="user", index=True)
     organization_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
     organization_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    portfolio_public: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
@@ -72,6 +73,9 @@ class Opportunity(Base):
     summary: Mapped[str] = mapped_column(Text)
     details: Mapped[str] = mapped_column(Text)
     organizer: Mapped[str] = mapped_column(String(160))
+    source_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    registration_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    accepts_registrations: Mapped[bool] = mapped_column(Boolean, default=False)
     image_url: Mapped[str | None] = mapped_column(Text)
     location_name: Mapped[str] = mapped_column(String(160))
     latitude: Mapped[float | None]
@@ -92,6 +96,7 @@ class Project(Base):
     title: Mapped[str] = mapped_column(String(200))
     summary: Mapped[str] = mapped_column(Text)
     owner_role: Mapped[str] = mapped_column(String(120))
+    result_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     roles: Mapped[list["ProjectRole"]] = relationship(back_populates="project", cascade="all, delete-orphan")
@@ -118,6 +123,41 @@ class Bookmark(Base):
     opportunity_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("opportunities.id", ondelete="CASCADE"))
 
 
+class Follow(Base):
+    __tablename__ = "follows"
+    __table_args__ = (UniqueConstraint("user_id", "kind", "value"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(20))
+    value: Mapped[str] = mapped_column(String(160))
+    label: Mapped[str] = mapped_column(String(160))
+    project_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+
+
+class RecommendationFeedback(Base):
+    __tablename__ = "recommendation_feedback"
+    __table_args__ = (UniqueConstraint("user_id", "project_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    helpful: Mapped[bool] = mapped_column(Boolean)
+
+
+class ContentReport(Base):
+    __tablename__ = "content_reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    reporter_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(20))
+    target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    reason: Mapped[str] = mapped_column(String(1000))
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
 class OpportunityAttendance(Base):
     __tablename__ = "opportunity_attendance"
     __table_args__ = (UniqueConstraint("user_id", "opportunity_id"),)
@@ -126,6 +166,20 @@ class OpportunityAttendance(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     opportunity_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("opportunities.id", ondelete="CASCADE"), index=True)
     attended: Mapped[bool] = mapped_column(Boolean, default=False)
+    verified_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+
+class EventRegistration(Base):
+    __tablename__ = "event_registrations"
+    __table_args__ = (UniqueConstraint("user_id", "opportunity_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    opportunity_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("opportunities.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(120))
+    email: Mapped[str] = mapped_column(String(320))
+    message: Mapped[str] = mapped_column(String(1000), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
 class Application(Base):

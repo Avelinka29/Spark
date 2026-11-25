@@ -15,6 +15,7 @@ final class SocialStore {
     private let token: String?
 
     var isAuthenticated: Bool { token != nil }
+    var reportToken: String? { token }
 
     init(token: String?) {
         self.token = token

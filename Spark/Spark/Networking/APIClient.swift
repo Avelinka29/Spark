@@ -146,6 +146,12 @@ actor APIClient {
             return "Код неверный или срок его действия истёк."
         case "Email delivery is not configured":
             return "Отправка писем временно недоступна."
+        case "Registration is not available":
+            return "Регистрация на это событие недоступна."
+        case "Registration is closed":
+            return "Регистрация уже закрыта."
+        case "Already registered":
+            return "Вы уже отправили заявку на это событие."
         default:
             return message
         }

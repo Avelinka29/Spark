@@ -22,11 +22,24 @@ async def test_only_known_projects_are_returned() -> None:
         ]})}})
 
     matches = await rank_projects("http://model", "test-model", ["Swift"], ["EdTech"],
-        [{"id": str(project_id), "title": "Project"}], transport=httpx.MockTransport(respond))
+        [{"id": str(project_id), "title": "Project", "roles": [{"title": "iOS", "skills": "Swift"}]}], transport=httpx.MockTransport(respond))
     assert [item.id for item in matches] == [project_id]
-    assert matches[0].reason == "Подходит Swift"
+    assert matches[0].reason == "Навык Swift указан для роли «iOS»."
     assert requests[0]["stream"] is False
     assert "Swift" in requests[0]["messages"][1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_hallucinated_skills_are_not_shown() -> None:
+    project_id = uuid.uuid4()
+    def respond(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"message": {"content": json.dumps({"matches": [
+            {"id": str(project_id), "reason": "Нужен Swift и Figma"}
+        ]})}})
+    matches = await rank_projects("http://model", "test", ["Swift", "Figma"], [],
+        [{"id": str(project_id), "roles": [{"title": "Backend", "skills": "Python"}]}],
+        transport=httpx.MockTransport(respond))
+    assert matches == []
 
 
 @pytest.mark.asyncio

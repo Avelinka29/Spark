@@ -4,7 +4,8 @@ import binascii
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from urllib.parse import urlsplit
 
 
 class RegisterRequest(BaseModel):
@@ -70,6 +71,10 @@ class OpportunityResponse(BaseModel):
     summary: str
     details: str
     organizer: str
+    source_url: str | None = None
+    registration_url: str | None = None
+    accepts_registrations: bool = False
+    owner_id: uuid.UUID | None = None
     image_url: str | None
     location_name: str
     latitude: float | None
@@ -80,12 +85,52 @@ class OpportunityResponse(BaseModel):
     reward: int | None
 
 
+class FollowCreate(BaseModel):
+    kind: Literal["topic", "organizer", "organization", "project"]
+    value: str = Field(min_length=1, max_length=160)
+
+
+class FollowResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    kind: Literal["topic", "organizer", "organization", "project"]
+    value: str
+    label: str
+
+
+class RecommendationFeedbackRequest(BaseModel):
+    helpful: bool
+
+
+class ReportCreate(BaseModel):
+    kind: Literal["user", "project", "opportunity"]
+    target_id: uuid.UUID
+    reason: str = Field(min_length=5, max_length=1000)
+
+
+class ReportResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    kind: str
+    target_id: uuid.UUID
+    reason: str
+    status: str
+    created_at: datetime
+
+
+class ReportDecision(BaseModel):
+    status: Literal["reviewed", "dismissed"]
+
+
 class OpportunityCreate(BaseModel):
     category: str = Field(min_length=2, max_length=50)
     title: str = Field(min_length=3, max_length=200)
     summary: str = Field(min_length=3, max_length=1000)
     details: str = Field(min_length=3, max_length=5000)
     image_url: str | None = None
+    source_url: str | None = Field(default=None, max_length=2048)
+    registration_url: str | None = Field(default=None, max_length=2048)
+    accepts_registrations: bool = False
     location_name: str = Field(min_length=2, max_length=160)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
@@ -93,6 +138,42 @@ class OpportunityCreate(BaseModel):
     ends_at: date | None = None
     deadline: date | None = None
     reward: int | None = Field(default=None, ge=0)
+
+    @field_validator("source_url", "registration_url")
+    @classmethod
+    def source_must_be_https(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        parsed = urlsplit(value)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError("Source must be an HTTPS link")
+        return value
+
+
+class EventRegistrationCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+    message: str = Field(default="", max_length=1000)
+
+
+class EventRegistrationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    name: str
+    email: EmailStr
+    message: str
+    created_at: datetime
+
+
+class OrganizationSummary(BaseModel):
+    id: uuid.UUID
+    name: str
+    region: str
+    bio: str
+
+
+class OrganizationDetail(OrganizationSummary):
+    events: list[OpportunityResponse]
 
 
 class EventProposalCreate(BaseModel):
@@ -145,6 +226,17 @@ class ProjectUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=2, max_length=200)
     summary: str | None = Field(default=None, min_length=10)
     owner_role: str | None = Field(default=None, min_length=2, max_length=120)
+    result_url: str | None = Field(default=None, max_length=2048)
+
+    @field_validator("result_url")
+    @classmethod
+    def result_must_be_https(cls, value: str | None) -> str | None:
+        if value is None or value == "":
+            return value
+        parsed = urlsplit(value)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError("Result must be an HTTPS link")
+        return value
 
 
 class ProjectResponse(ProjectCreate):
@@ -152,7 +244,13 @@ class ProjectResponse(ProjectCreate):
 
     id: uuid.UUID
     owner_id: uuid.UUID
+    result_url: str | None = None
     roles: list[RoleResponse]
+
+
+class FollowFeed(BaseModel):
+    opportunities: list[OpportunityResponse]
+    projects: list[ProjectResponse]
 
 
 class ApplicationStatusUpdate(BaseModel):
@@ -184,6 +282,11 @@ class ProfileResponse(BaseModel):
     account_type: str = "user"
     organization_name: str | None = None
     organization_status: str | None = None
+    portfolio_public: bool = True
+
+
+class PortfolioVisibilityUpdate(BaseModel):
+    portfolio_public: bool
 
 
 class ProfileUpdate(BaseModel):
@@ -218,7 +321,14 @@ class AttendingFriend(BaseModel):
 class AttendanceResponse(BaseModel):
     going: bool
     attended: bool = False
+    verified: bool = False
     friends: list[AttendingFriend]
+
+
+class AttendanceParticipant(BaseModel):
+    id: uuid.UUID
+    name: str
+    verified: bool
 
 
 class TeamTaskCreate(BaseModel):
@@ -246,11 +356,13 @@ class PortfolioProject(BaseModel):
     title: str
     role: str
     role_id: uuid.UUID | None = None
+    result_url: str | None = None
 
 
 class PortfolioEvent(BaseModel):
     id: uuid.UUID
     title: str
+    verified: bool = False
     starts_at: date | None
 
 
@@ -263,6 +375,7 @@ class PublicProfileResponse(BaseModel):
     skills: list[str]
     interests: list[str]
     friendship_status: Literal["none", "pending_sent", "pending_received", "friends", "self"]
+    portfolio_visible: bool = True
     projects: list[PortfolioProject] = []
     events: list[PortfolioEvent] = []
 

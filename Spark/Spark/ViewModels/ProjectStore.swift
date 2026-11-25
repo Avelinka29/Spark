@@ -13,10 +13,12 @@ final class ProjectStore {
     private(set) var aiMatches: [AIProjectMatchDTO] = []
     private(set) var aiIsLoading = false
     private(set) var aiMessage: String?
+    private(set) var aiFeedback: [UUID: Bool] = [:]
 
     private let token: String?
 
     var isAuthenticated: Bool { token != nil }
+    var reportToken: String? { token }
 
     init(token: String? = nil, projects: [Project] = []) {
         self.token = token
@@ -47,6 +49,18 @@ final class ProjectStore {
         } catch {
             aiMatches = []
             aiMessage = "ИИ сейчас недоступен. Обычный подбор продолжает работать."
+        }
+    }
+
+    func sendAIFeedback(projectID: UUID, helpful: Bool) async {
+        guard let token else { return }
+        do {
+            let _: EmptyResponse = try await APIClient.shared.send(
+                path: "recommendations/projects/\(projectID)/feedback", method: "PUT",
+                body: AIFeedbackRequest(helpful: helpful), token: token)
+            aiFeedback[projectID] = helpful
+        } catch {
+            aiMessage = "Не удалось сохранить отзыв. Попробуй ещё раз."
         }
     }
 
@@ -196,7 +210,8 @@ final class ProjectStore {
         category: String,
         title: String,
         summary: String,
-        ownerRole: String
+        ownerRole: String,
+        resultURL: String
     ) async -> Bool {
         guard let token else { return false }
         do {
@@ -207,7 +222,8 @@ final class ProjectStore {
                     category: category,
                     title: title,
                     summary: summary,
-                    ownerRole: ownerRole
+                    ownerRole: ownerRole,
+                    resultURL: resultURL
                 ),
                 token: token
             )

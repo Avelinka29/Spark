@@ -45,9 +45,9 @@ struct ProfileAvatar: View {
                             .clipShape(Circle())
                             .shadow(radius: 3)
                     }
+                    .accessibilityLabel("Изменить фото профиля")
                 }
             }
-            .offset(y: 65)
         .task(id: selectedItem) {
             guard let data = try? await selectedItem?.loadTransferable(type: Data.self) else {
                 return

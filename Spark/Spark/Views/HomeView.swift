@@ -11,6 +11,12 @@ struct HomeView: View {
     let onAvatarTap: () -> Void
 
     @State private var model = OpportunitiesViewModel()
+    @State private var showSubscriptions = false
+    @State private var showGoalRoute = false
+    @State private var showOrganizations = false
+    @State private var showSaved = false
+    @State private var subscriptionRefreshID = UUID()
+    @State private var showSignInMessage = false
 
     private let categories = EventCategory.allCases
 
@@ -27,6 +33,48 @@ struct HomeView: View {
                 )
 
                 Divider()
+
+                Button { showOrganizations = true } label: {
+                    Label("Найти организацию", systemImage: "building.2")
+                        .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                }.buttonStyle(.plain).padding(.horizontal)
+
+                Button {
+                    if accessToken == nil { showSignInMessage = true } else { showSaved = true }
+                } label: {
+                    Label("Сохранённые события", systemImage: "bookmark")
+                        .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                }.buttonStyle(.plain).padding(.horizontal)
+
+                Button {
+                    if accessToken == nil { showSignInMessage = true }
+                    else { showSubscriptions = true }
+                } label: {
+                    Label("Подписки и моя лента", systemImage: "bell.badge")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal)
+
+                Button {
+                    if accessToken == nil { showSignInMessage = true }
+                    else { showGoalRoute = true }
+                } label: {
+                    Label("Маршрут к цели", systemImage: "map")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                }.buttonStyle(.plain).padding(.horizontal)
+
+                if let accessToken {
+                    SubscriptionHighlights(token: accessToken, refreshID: subscriptionRefreshID)
+                }
 
                 let recommendations = OpportunityRecommendations.matching(model.opportunities, interests: interests)
                 if !recommendations.isEmpty {
@@ -91,6 +139,17 @@ struct HomeView: View {
                 }
             }
             .navigationBarBackButtonHidden(true)
+            .sheet(isPresented: $showSubscriptions, onDismiss: { subscriptionRefreshID = UUID() }) {
+                if let accessToken { SubscriptionsView(token: accessToken) }
+            }
+            .sheet(isPresented: $showGoalRoute) {
+                if let accessToken { GoalRouteView(token: accessToken) }
+            }
+            .sheet(isPresented: $showOrganizations, onDismiss: { subscriptionRefreshID = UUID() }) { OrganizationsView(token: accessToken) }
+            .sheet(isPresented: $showSaved) { if let accessToken { SavedOpportunitiesView(token: accessToken) } }
+            .alert("Нужен аккаунт", isPresented: $showSignInMessage) {
+                Button("Понятно", role: .cancel) {}
+            } message: { Text("Войди, чтобы пользоваться подписками и маршрутом к цели.") }
             .task(id: refreshID) {
                 await model.load()
             }
