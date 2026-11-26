@@ -131,9 +131,9 @@ struct SubscriptionsView: View {
     var body: some View {
         NavigationStack {
             List {
+                SparkDiscoveryHero(title: "Подписки", subtitle: "Выбирай темы, организаторов и проекты для своей ленты.", symbol: "bell.badge")
+                    .listRowInsets(EdgeInsets()).listRowBackground(Color.clear).listRowSeparator(.hidden)
                 Section {
-                    Text("Выбирай темы, организаторов и проекты — подходящие возможности появятся здесь.")
-                        .font(.subheadline).foregroundStyle(.secondary)
                     Text("Пока без push-уведомлений. Организаторы определяются по названию в карточке события.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
@@ -209,6 +209,7 @@ struct SubscriptionsView: View {
                     Section { Text(error).foregroundStyle(.red); Button("Повторить") { Task { await store.load() } } }
                 }
             }
+            .listStyle(.insetGrouped)
             .navigationTitle("Подписки")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Готово") { dismiss() } } }

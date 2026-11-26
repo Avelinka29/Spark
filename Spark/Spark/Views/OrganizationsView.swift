@@ -32,29 +32,48 @@ struct OrganizationsView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                if loading { ProgressView("Ищем организации…").frame(maxWidth: .infinity).padding() }
-                if let error { Text(error).foregroundStyle(.red); Button("Повторить") { Task { await load() } } }
-                let results = organizations.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || $0.region.localizedCaseInsensitiveContains(search) }
-                if results.isEmpty && !loading && error == nil {
-                    ContentUnavailableView(search.isEmpty ? "Организаций пока нет" : "Ничего не найдено", systemImage: "building.2.crop.circle", description: Text(search.isEmpty ? "Здесь появятся организации, подтверждённые Spark." : "Попробуй другое название или регион."))
-                        .listRowBackground(Color.clear)
-                }
-                ForEach(results) { organization in
-                    NavigationLink {
-                        OrganizationDetailsView(id: organization.id, token: token)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Label(organization.name, systemImage: "building.2.fill").font(.headline)
-                                .foregroundStyle(.primaryLitePurple)
-                            if !organization.region.isEmpty { Text(organization.region).font(.caption).foregroundStyle(.secondary) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    SparkDiscoveryHero(title: "Организации", subtitle: "Ищи подтверждённых организаторов по названию или региону.", symbol: "building.2")
+                    HStack {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.primaryLitePurple)
+                        TextField("Название или регион", text: $search)
+                    }
+                    .padding(14).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.primaryLitePurple.opacity(0.2)))
+                    if loading { ProgressView("Ищем организации…").frame(maxWidth: .infinity).padding() }
+                    if let error {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(error).foregroundStyle(.red)
+                            Button("Повторить") { Task { await load() } }
+                        }.sparkCard()
+                    }
+                    let results = organizations.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || $0.region.localizedCaseInsensitiveContains(search) }
+                    if results.isEmpty && !loading && error == nil {
+                        SparkDiscoveryEmpty(title: search.isEmpty ? "Организаций пока нет" : "Ничего не найдено", detail: search.isEmpty ? "Подтверждённые Spark организации появятся здесь. Пока можно посмотреть события в ленте." : "Попробуй другое название или регион.", symbol: "building.2", actionTitle: search.isEmpty ? "В ленту" : "Очистить поиск") {
+                            if search.isEmpty { dismiss() } else { search = "" }
                         }
                     }
-                }
+                    ForEach(results) { organization in
+                        NavigationLink {
+                            OrganizationDetailsView(id: organization.id, token: token)
+                        } label: {
+                            HStack(spacing: 12) {
+                                SparkTileIcon(symbol: "building.2")
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(organization.name).font(.headline).foregroundStyle(.primary)
+                                    if !organization.region.isEmpty { Text(organization.region).font(.caption).foregroundStyle(.secondary) }
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                            }.sparkCard()
+                        }.buttonStyle(.plain)
+                    }
+                }.padding(20)
             }
-            .listStyle(.insetGrouped)
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Организации")
-            .searchable(text: $search, prompt: "Название или регион")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Готово") { dismiss() } } }
             .task { await load() }
             .refreshable { await load() }

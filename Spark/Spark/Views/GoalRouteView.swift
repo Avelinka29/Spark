@@ -20,14 +20,22 @@ struct GoalRouteView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Text("Напиши направление, например EdTech, дизайн или Swift. Spark найдёт связанные события и проекты.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    TextField("Моя цель или интерес", text: $goal)
-                    Button("Построить маршрут") { Task { await buildRoute() } }
+                SparkDiscoveryHero(title: "Маршрут к цели", subtitle: "Введи цель или интерес. Spark найдёт связанные события и проекты.", symbol: "location.north.fill")
+                    .listRowInsets(EdgeInsets()).listRowBackground(Color.clear).listRowSeparator(.hidden)
+                Section("Моя цель") {
+                    TextField("Например, мобильная разработка", text: $goal)
+                    Button("Построить маршрут", systemImage: "arrow.right") { Task { await buildRoute() } }
                         .disabled(loading || goal.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
-                    Text("Первая версия ищет совпадения по словам в опубликованных данных. Это не профессиональная рекомендация.")
+                    Text("Поиск основан на совпадениях слов в опубликованных данных.")
                         .font(.footnote).foregroundStyle(.secondary)
+                }
+                Section("Попробуй одну из тем") {
+                    HStack {
+                        ForEach(["EdTech", "Дизайн", "Swift"], id: \.self) { example in
+                            Button(example) { goal = example; Task { await buildRoute() } }
+                                .buttonStyle(.bordered).tint(.primaryLitePurple)
+                        }
+                    }
                 }
                 if loading { ProgressView("Ищем возможности…") }
                 if let error { Text(error).foregroundStyle(.red) }
@@ -55,6 +63,7 @@ struct GoalRouteView: View {
                     }
                 }
             }
+            .listStyle(.insetGrouped)
             .navigationTitle("Маршрут к цели")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Готово") { dismiss() } } }

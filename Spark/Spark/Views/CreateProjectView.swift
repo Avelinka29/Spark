@@ -16,6 +16,7 @@ struct CreateProjectView: View {
     @State private var ownerRole = ""
     @State private var selectedCategory = "EdTech"
     @State private var projectRoles = [DraftRole()]
+    @State private var isCreating = false
 
     private let categories = [
         "FinTech",
@@ -35,6 +36,8 @@ struct CreateProjectView: View {
     var body: some View {
         NavigationStack {
             Form {
+                SparkDiscoveryHero(title: "Новый проект", subtitle: "Расскажи об идее и укажи, кого ищешь в команду.", symbol: "square.grid.2x2")
+                    .listRowInsets(EdgeInsets()).listRowBackground(Color.clear).listRowSeparator(.hidden)
                 Section("Основное") {
                     TextField("Название проекта", text: $projectTitle)
 
@@ -68,10 +71,23 @@ struct CreateProjectView: View {
                     Button("Добавить роль", systemImage: "plus") {
                         projectRoles.append(DraftRole())
                     }
+                    .frame(maxWidth: .infinity)
                 } header: {
                     Text("Роли в команде")
                 } footer: {
                     Text("Пустые роли не будут добавлены.")
+                }
+                if let error = store.errorMessage {
+                    Text(error).foregroundStyle(.red)
+                }
+                Section {
+                    Button {
+                        createProject()
+                    } label: {
+                        if isCreating { ProgressView().frame(maxWidth: .infinity) }
+                        else { Label("Создать проект", systemImage: "checkmark").frame(maxWidth: .infinity) }
+                    }
+                    .disabled(!canCreate || isCreating)
                 }
             }
             .navigationTitle("Новый проект")
@@ -83,12 +99,6 @@ struct CreateProjectView: View {
                     }
                 }
 
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Создать") {
-                        createProject()
-                    }
-                    .disabled(!canCreate)
-                }
             }
         }
     }
@@ -114,10 +124,12 @@ struct CreateProjectView: View {
             vacancies: vacancies
         )
 
+        isCreating = true
         Task {
             if await store.createProject(project) {
                 dismiss()
             }
+            isCreating = false
         }
     }
 }

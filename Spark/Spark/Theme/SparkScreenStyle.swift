@@ -59,3 +59,45 @@ struct SparkEmptyRow: View {
         .sparkCard()
     }
 }
+
+/// Shared introductory card for the discovery sheets.
+struct SparkDiscoveryHero: View {
+    let title: String
+    let subtitle: String
+    let symbol: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Image(systemName: symbol)
+                .font(.headline)
+                .frame(width: 42, height: 42)
+                .background(.white.opacity(0.24), in: RoundedRectangle(cornerRadius: 13))
+                .accessibilityHidden(true)
+            Text(title).font(.title2.bold())
+            Text(subtitle).font(.subheadline).fixedSize(horizontal: false, vertical: true)
+        }
+        .sparkHero()
+    }
+}
+
+struct SparkDiscoveryEmpty: View {
+    let title: String
+    let detail: String
+    let symbol: String
+    let actionTitle: String
+    let action: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SparkTileIcon(symbol: symbol)
+            Text(title).font(.headline)
+            Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(actionTitle, systemImage: "arrow.right", action: action)
+                .buttonStyle(.bordered)
+                .tint(.primaryLitePurple)
+                .frame(maxWidth: .infinity)
+        }
+        .sparkCard(padding: 20)
+    }
+}

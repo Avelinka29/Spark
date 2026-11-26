@@ -29,7 +29,7 @@ struct HomeView: View {
                 Text(subtitle).font(.caption).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, minHeight: 105, alignment: .leading)
-            .padding(14).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
+            .padding(14).background(color.opacity(0.11), in: RoundedRectangle(cornerRadius: 18))
         }.buttonStyle(.plain)
     }
 
@@ -45,12 +45,12 @@ struct HomeView: View {
                     onTap: onAvatarTap
                 )
 
-                Divider()
+                Text("Открой для себя")
+                    .font(.title2.bold()).frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal).padding(.top, 12)
+                OpportunityFilters(searchText: $model.searchText, selectedCategory: $model.selectedCategory, categories: categories)
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Открой для себя").font(.title3.bold())
-                    Text("Организации, события и твои возможности")
-                        .font(.subheadline).foregroundStyle(.secondary)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
                         homeShortcut("Организации", subtitle: "Найти и подписаться", icon: "building.2", color: .blue) { showOrganizations = true }
                         homeShortcut("Сохранённое", subtitle: "Твои события", icon: "bookmark", color: .orange) {
@@ -88,7 +88,9 @@ struct HomeView: View {
                     }.padding(.horizontal)
                 }
 
-                LazyVStack(pinnedViews: [.sectionHeaders]) {
+                Text("Возможности").font(.title3.bold())
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal).padding(.top, 8)
+                LazyVStack(spacing: 12) {
                     Section {
                         if model.visibleOpportunities.isEmpty {
                             ContentUnavailableView(
@@ -122,12 +124,6 @@ struct HomeView: View {
                                 .padding(.horizontal)
                             }
                         }
-                    } header: {
-                        OpportunityFilters(
-                            searchText: $model.searchText,
-                            selectedCategory: $model.selectedCategory,
-                            categories: categories
-                        )
                     }
                 }
             }
@@ -265,7 +261,6 @@ private struct OpportunityFilters: View {
                 .padding(.bottom, 5)
             }
         }
-        .background(.ultraThinMaterial)
     }
 }
 

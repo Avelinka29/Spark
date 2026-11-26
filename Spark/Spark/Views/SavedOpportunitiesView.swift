@@ -9,15 +9,39 @@ struct SavedOpportunitiesView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                if loading { ProgressView() }
-                if items.isEmpty && !loading && error == nil { Text("Сохранённых событий пока нет.").foregroundStyle(.secondary) }
-                ForEach(items, id: \.id) { item in
-                    NavigationLink(item.title) { OpportunityDetailsView(opportunity: item.makeOpportunity(), accessToken: token) }
-                }
-                if let error { Text(error).foregroundStyle(.red); Button("Повторить") { Task { await load() } } }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    SparkDiscoveryHero(title: "Сохранённое", subtitle: "События, к которым хочешь вернуться.", symbol: "bookmark")
+                    if loading { ProgressView("Загружаем события…").frame(maxWidth: .infinity).padding() }
+                    if items.isEmpty && !loading && error == nil {
+                        SparkDiscoveryEmpty(title: "Пока ничего не сохранено", detail: "Открой событие и нажми на закладку, чтобы добавить его сюда.", symbol: "bookmark", actionTitle: "Открыть ленту") { dismiss() }
+                    }
+                    ForEach(items, id: \.id) { item in
+                        NavigationLink {
+                            OpportunityDetailsView(opportunity: item.makeOpportunity(), accessToken: token)
+                        } label: {
+                            HStack {
+                                SparkTileIcon(symbol: "calendar")
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(item.title).font(.headline).foregroundStyle(.primary)
+                                    Text(item.organizer).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                            }.sparkCard()
+                        }.buttonStyle(.plain)
+                    }
+                    if let error {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(error).foregroundStyle(.red)
+                            Button("Повторить") { Task { await load() } }
+                        }.sparkCard()
+                    }
+                }.padding(20)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Сохранённое")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Готово") { dismiss() } } }
             .onAppear { Task { await load() } }
             .refreshable { await load() }
