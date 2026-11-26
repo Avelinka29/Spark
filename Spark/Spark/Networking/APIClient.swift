@@ -150,6 +150,12 @@ actor APIClient {
             return "Регистрация на это событие недоступна."
         case "Registration is closed":
             return "Регистрация уже закрыта."
+        case "Application already exists":
+            return "Вы уже откликнулись на эту роль. Проверьте раздел «Отклики»."
+        case "Open role not found", "Project role is already closed":
+            return "Набор на эту роль уже закрыт."
+        case "Cannot apply to your own project":
+            return "Нельзя откликнуться на собственный проект."
         case "Already registered":
             return "Вы уже отправили заявку на это событие."
         default:

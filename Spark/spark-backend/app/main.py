@@ -1001,13 +1001,15 @@ async def apply_to_role(
     role = await session.get(ProjectRole, role_id)
     if role is None or not role.is_open:
         raise HTTPException(status_code=404, detail="Open role not found")
+    project = await session.get(Project, role.project_id)
+    if project is not None and project.owner_id == user.id:
+        raise HTTPException(status_code=403, detail="Cannot apply to your own project")
     existing = await session.scalar(select(Application).where(Application.user_id == user.id, Application.project_role_id == role_id))
     if existing is not None:
         raise HTTPException(status_code=409, detail="Application already exists")
     application = Application(user_id=user.id, project_role_id=role_id)
     session.add(application)
-    project = await session.get(Project, role.project_id)
-    if project is not None and project.owner_id != user.id:
+    if project is not None:
         session.add(
             Notification(
                 user_id=project.owner_id,

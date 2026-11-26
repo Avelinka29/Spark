@@ -220,3 +220,9 @@ Never commit `.env`, SMTP passwords, OAuth client secrets, database passwords or
 The repository is provider-neutral. A public deployment still requires choosing and paying for a server or managed platform, configuring DNS/HTTPS, and supplying production credentials. Database schema changes after the first production launch must be delivered as Alembic migrations rather than by editing `001_initial.sql`.
 
 Profile date of birth is optional, can be removed, and is returned only by the authenticated profile API; public profiles do not expose it. The profile display name can include a first and last name.
+
+Project applications are visible to the project owner under «Проекты → Отклики».
+Only the owner can accept or reject applications; a user cannot apply to their own
+project. A team chat is created after every role has an accepted applicant. Demo
+projects have a demonstration owner who does not review applications; use real
+accounts and a user-created project to test the complete flow.

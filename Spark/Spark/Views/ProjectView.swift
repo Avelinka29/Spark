@@ -57,7 +57,7 @@ struct ProjectView: View {
                             ForEach(store.aiMatches) { match in
                                 if let project = store.projects.first(where: { $0.id == match.id }) {
                                     NavigationLink {
-                                        ProjectDetailsView(project: project, store: store, isOwner: false)
+                                        ProjectDetailsView(project: project, store: store, isOwner: project.ownerID == currentUserID)
                                     } label: {
                                         RecommendationCard(project: project, reasons: [match.reason], symbol: "sparkles")
                                     }.buttonStyle(.plain)
@@ -80,7 +80,7 @@ struct ProjectView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         ForEach(recommendations.prefix(3)) { recommendation in
                             NavigationLink {
-                                ProjectDetailsView(project: recommendation.project, store: store, isOwner: false)
+                                ProjectDetailsView(project: recommendation.project, store: store, isOwner: recommendation.project.ownerID == currentUserID)
                             } label: {
                                 RecommendationCard(project: recommendation.project, reasons: recommendation.reasons, symbol: "checkmark.seal")
                             }
@@ -116,6 +116,7 @@ struct ProjectView: View {
                             symbol: "person.3"
                         )
                     } else if selectedSection == 0 {
+                        LazyVStack(spacing: 10) {
                         ForEach(store.projects) { project in
                             NavigationLink {
                                 ProjectDetailsView(
@@ -134,6 +135,7 @@ struct ProjectView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                        }
                         }
                     }
                 }
@@ -257,6 +259,8 @@ private struct ProjectDetailsView: View {
     @State private var showDeleteConfirmation = false
     @State private var showEditor = false
     @State private var showReport = false
+    @State private var applyingRoleID: UUID?
+    @State private var applicationMessage: String?
 
     private var currentProject: Project {
         store.projects.first { $0.id == project.id } ?? project
@@ -276,7 +280,7 @@ private struct ProjectDetailsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Divider().padding(.vertical, 4)
                     Label(currentProject.ownerRole, systemImage: "person.crop.circle")
-                    Label("\(currentProject.memberCount) в команде", systemImage: "person.2")
+                    Label("Заполнено ролей: \(currentProject.vacancies.filter { !$0.isActive }.count) из \(currentProject.vacancies.count)", systemImage: "person.2")
                     if let value = currentProject.resultURL, let url = URL(string: value), url.scheme == "https" {
                         Link(destination: url) { Label("Результат проекта", systemImage: "arrow.up.right.square") }
                     }
@@ -285,6 +289,14 @@ private struct ProjectDetailsView: View {
                 .padding(20)
                 .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
 
+                if currentProject.title.hasPrefix("[Демо]") {
+                    Label("Учебный пример: отклик сохранится, но демонстрационный создатель не рассмотрит его.", systemImage: "info.circle")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                if isOwner {
+                    Label("Заявки появятся во вкладке «Отклики». Когда все роли будут заполнены, чат команды создастся автоматически.", systemImage: "person.3.sequence")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
                 Text("Роли в команде").font(.title3.bold())
                 if !store.isAuthenticated {
                     Label("Войдите, чтобы откликаться на роли", systemImage: "lock")
@@ -305,17 +317,26 @@ private struct ProjectDetailsView: View {
                             .fixedSize(horizontal: false, vertical: true)
 
                         if !isOwner {
-                        Button(vacancy.isActive ? "Откликнуться" : vacancy.status) {
-                            Task {
-                                await store.join(
-                                    projectID: project.id,
-                                    vacancyID: vacancy.id
-                                )
+                            let application = store.myApplications.first { $0.roleID == vacancy.id }
+                            if let application {
+                                Label(application.status == "accepted" ? "Вас приняли в команду" : application.status == "rejected" ? "Заявка отклонена" : "Заявка отправлена", systemImage: "checkmark.circle")
+                                    .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                            } else {
+                                Button {
+                                    applyingRoleID = vacancy.id
+                                    Task {
+                                        let sent = await store.join(projectID: project.id, vacancyID: vacancy.id)
+                                        applicationMessage = sent ? "Заявка отправлена создателю проекта. Следить за ответом можно в разделе «Отклики»." : (store.errorMessage ?? "Не удалось отправить заявку. Попробуй ещё раз.")
+                                        applyingRoleID = nil
+                                    }
+                                } label: {
+                                    if applyingRoleID == vacancy.id { ProgressView() }
+                                    else { Text(vacancy.isActive ? "Откликнуться" : "Набор закрыт") }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.primaryLitePurple)
+                                .disabled(!vacancy.isActive || !store.isAuthenticated || applyingRoleID != nil)
                             }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.primaryLitePurple)
-                        .disabled(!vacancy.isActive || !store.isAuthenticated)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -338,6 +359,9 @@ private struct ProjectDetailsView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Проект")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Отклик на проект", isPresented: Binding(get: { applicationMessage != nil }, set: { if !$0 { applicationMessage = nil } })) {
+            Button("Понятно", role: .cancel) { applicationMessage = nil }
+        } message: { Text(applicationMessage ?? "") }
         .toolbar {
             if isOwner {
                 ToolbarItem(placement: .primaryAction) {
@@ -492,6 +516,8 @@ private struct ApplicationInbox: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Заявки в мои проекты")
                 .font(.title3.bold())
+            Text("Выбери участников для открытых ролей. Когда команда соберётся, чат появится в сообществе.")
+                .font(.subheadline).foregroundStyle(.secondary)
 
             ForEach(store.receivedApplications) { application in
                 VStack(alignment: .leading, spacing: 8) {
@@ -539,7 +565,7 @@ private struct MyApplications: View {
                 HStack {
                     VStack(alignment: .leading) {
                         Text(application.projectTitle).font(.headline)
-                        Text("\(application.roleTitle) · \(application.status)")
+                        Text("\(application.roleTitle) · \(application.status == "pending" ? "На рассмотрении" : application.status == "accepted" ? "Принята" : "Отклонена")")
                             .foregroundStyle(.secondary)
                     }
                     Spacer()

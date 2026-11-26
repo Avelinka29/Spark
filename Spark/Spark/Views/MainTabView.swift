@@ -141,6 +141,10 @@ struct MainTabView: View {
         .onChange(of: selectedTab) { _, tab in
             if tab == 4 {
                 Task { await profileStore.load() }
+            } else if tab == 2 {
+                Task { await projectStore.load() }
+            } else if tab == 3 {
+                Task { await socialStore.load() }
             }
         }
         .navigationBarBackButtonHidden(true)

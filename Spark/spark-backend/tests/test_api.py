@@ -64,6 +64,7 @@ def create_verified_user(client: httpx.Client, email: str, name: str) -> dict[st
 
 def test_full_user_scenario() -> None:
     email = f"spark-{uuid.uuid4()}@example.com"
+    applicant_email = f"applicant-{uuid.uuid4()}@example.com"
 
     try:
         with httpx.Client(base_url=BASE_URL, timeout=10) as client:
@@ -199,14 +200,16 @@ def test_full_user_scenario() -> None:
             assert len(project["roles"]) == 2
 
             role_id = project["roles"][0]["id"]
+            applicant_headers = create_verified_user(client, applicant_email, "Project Applicant")
+            assert client.post(f"/api/v1/project-roles/{role_id}/applications", headers=headers).status_code == 403
             application = client.post(
                 f"/api/v1/project-roles/{role_id}/applications",
-                headers=headers,
+                headers=applicant_headers,
             )
             assert application.status_code == 201
 
             application_id = application.json()["id"]
-            mine = client.get("/api/v1/applications/mine", headers=headers)
+            mine = client.get("/api/v1/applications/mine", headers=applicant_headers)
             assert mine.status_code == 200
             assert application_id in {item["id"] for item in mine.json()}
 
@@ -235,12 +238,12 @@ def test_full_user_scenario() -> None:
             second_role_id = project["roles"][1]["id"]
             second_application = client.post(
                 f"/api/v1/project-roles/{second_role_id}/applications",
-                headers=headers,
+                headers=applicant_headers,
             )
             assert second_application.status_code == 201
             cancelled = client.delete(
                 f"/api/v1/applications/{second_application.json()['id']}",
-                headers=headers,
+                headers=applicant_headers,
             )
             assert cancelled.status_code == 204
 
@@ -289,6 +292,7 @@ def test_full_user_scenario() -> None:
             assert login_after_deletion.status_code == 401
     finally:
         asyncio.run(delete_test_user(email))
+        asyncio.run(delete_test_user(applicant_email))
 
 
 async def delete_test_user(email: str) -> None:

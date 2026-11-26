@@ -127,32 +127,22 @@ final class ProjectStore {
         }
     }
 
-    func join(projectID: Project.ID, vacancyID: Vacancy.ID) async {
+    func join(projectID: Project.ID, vacancyID: Vacancy.ID) async -> Bool {
         guard let token else {
             errorMessage = "Для отклика необходимо войти."
-            return
+            return false
         }
-
+        errorMessage = nil
         do {
             let _: ApplicationResponse = try await APIClient.shared.send(
-                path: "project-roles/\(vacancyID)/applications",
-                method: "POST",
-                token: token
+                path: "project-roles/\(vacancyID)/applications", method: "POST", token: token
             )
-
-            guard let projectIndex = projects.firstIndex(where: { $0.id == projectID }),
-                  let vacancyIndex = projects[projectIndex].vacancies.firstIndex(
-                    where: { $0.id == vacancyID }
-                  ) else {
-                return
-            }
-
-            projects[projectIndex].vacancies[vacancyIndex].isActive = false
-            projects[projectIndex].vacancies[vacancyIndex].status = "ЗАЯВКА"
             await load()
             successFeedbackTrigger += 1
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
