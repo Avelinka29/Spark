@@ -43,6 +43,7 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/020_project_result_url.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/021_event_registration.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/022_organization_follows.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U spark -d spark < sql/023_profile_birth_date.sql
 ```
 
 For older databases, inspect the schema and apply the missing numbered SQL files in
@@ -217,3 +218,5 @@ Never commit `.env`, SMTP passwords, OAuth client secrets, database passwords or
 ## Remaining deployment decision
 
 The repository is provider-neutral. A public deployment still requires choosing and paying for a server or managed platform, configuring DNS/HTTPS, and supplying production credentials. Database schema changes after the first production launch must be delivered as Alembic migrations rather than by editing `001_initial.sql`.
+
+Profile date of birth is optional, can be removed, and is returned only by the authenticated profile API; public profiles do not expose it. The profile display name can include a first and last name.

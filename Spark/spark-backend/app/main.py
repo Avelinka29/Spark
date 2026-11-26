@@ -1198,7 +1198,10 @@ async def update_my_profile(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> User:
-    for field, value in payload.model_dump(exclude_none=True).items():
+    fields = payload.model_dump(exclude_unset=True)
+    for field, value in fields.items():
+        if value is None and field != "birth_date":
+            continue
         if isinstance(value, list):
             value = [item.strip() for item in value if item.strip()]
         setattr(user, field, value)

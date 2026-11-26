@@ -36,6 +36,7 @@ class User(Base):
     google_sub: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     name: Mapped[str] = mapped_column(String(120))
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     username: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True)
     region: Mapped[str] = mapped_column(String(120), default="")
     bio: Mapped[str] = mapped_column(Text, default="")

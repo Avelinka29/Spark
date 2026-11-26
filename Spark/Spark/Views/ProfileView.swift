@@ -66,7 +66,7 @@ private struct ProfileContent: View {
     let onAvatarSelected: (Data) -> Void
     let onAddAchievement: (String, String, Date) async -> Bool
     let onDeleteAchievement: (UUID) async -> Void
-    let onUpdateProfile: (String, String, String, [String], [String]) async -> Bool
+    let onUpdateProfile: (String, String?, String, String, [String], [String]) async -> Bool
     let onEnableOrganization: (String) async -> Bool
     let onCreateOpportunity: (OpportunityCreateRequest) async -> Bool
     let onOpportunityCreated: () -> Void
@@ -248,8 +248,8 @@ private struct ProfileContent: View {
             if let token = store.reportToken { AdminReportsView(token: token) }
         }
         .sheet(isPresented: $showProfileEditor) {
-            ProfileEditView(profile: profile) { name, region, bio, skills, interests in
-                let saved = await onUpdateProfile(name, region, bio, skills, interests)
+            ProfileEditView(profile: profile) { name, birthDate, region, bio, skills, interests in
+                let saved = await onUpdateProfile(name, birthDate, region, bio, skills, interests)
                 if saved {
                     showProfileEditor = false
                 }
@@ -262,9 +262,12 @@ private struct ProfileContent: View {
 private struct ProfileEditView: View {
     @Environment(\.dismiss) private var dismiss
 
-    let onSave: (String, String, String, [String], [String]) async -> Bool
+    let onSave: (String, String?, String, String, [String], [String]) async -> Bool
 
     @State private var name: String
+    @State private var surname: String
+    @State private var hasBirthDate: Bool
+    @State private var birthDate: Date
     @State private var region: String
     @State private var bio: String
     @State private var skillsText: String
@@ -273,10 +276,18 @@ private struct ProfileEditView: View {
 
     init(
         profile: UserProfile,
-        onSave: @escaping (String, String, String, [String], [String]) async -> Bool
+        onSave: @escaping (String, String?, String, String, [String], [String]) async -> Bool
     ) {
         self.onSave = onSave
-        _name = State(initialValue: profile.name)
+        let parts = profile.name.split(separator: " ", maxSplits: 1).map(String.init)
+        _name = State(initialValue: parts.first ?? "")
+        _surname = State(initialValue: parts.count > 1 ? parts[1] : "")
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        let savedBirthDate = profile.birthDate.flatMap { formatter.date(from: $0) }
+        _hasBirthDate = State(initialValue: savedBirthDate != nil)
+        _birthDate = State(initialValue: savedBirthDate ?? Date())
         _region = State(initialValue: profile.region)
         _bio = State(initialValue: profile.bio)
         _skillsText = State(initialValue: profile.skills.joined(separator: ", "))
@@ -287,7 +298,17 @@ private struct ProfileEditView: View {
         NavigationStack {
             Form {
                 Section("Основное") {
-                    TextField("Имя", text: $name)
+                    TextField("Имя", text: $name).textContentType(.givenName)
+                    TextField("Фамилия", text: $surname).textContentType(.familyName)
+                    Toggle("Указать дату рождения", isOn: $hasBirthDate)
+                    if hasBirthDate {
+                        DatePicker("Дата рождения", selection: $birthDate, in: (Calendar.current.date(from: DateComponents(year: 1900)) ?? .distantPast)...Date(), displayedComponents: .date)
+                        if let age = Calendar.current.dateComponents([.year], from: birthDate, to: Date()).year {
+                            Text("Возраст: \(age)").foregroundStyle(.secondary)
+                        }
+                    }
+                    Text("Дата рождения видна только тебе. Имя и фамилия отображаются в профиле.")
+                        .font(.footnote).foregroundStyle(.secondary)
                     TextField("Регион", text: $region)
                     TextField("О себе", text: $bio, axis: .vertical)
                         .lineLimit(3...6)
@@ -318,7 +339,8 @@ private struct ProfileEditView: View {
                         isSaving = true
                         Task {
                             _ = await onSave(
-                                name.trimmingCharacters(in: .whitespacesAndNewlines),
+                                [name, surname].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.joined(separator: " "),
+                                hasBirthDate ? birthDateString : nil,
                                 region.trimmingCharacters(in: .whitespacesAndNewlines),
                                 bio.trimmingCharacters(in: .whitespacesAndNewlines),
                                 commaSeparatedValues(skillsText),
@@ -331,6 +353,13 @@ private struct ProfileEditView: View {
                 }
             }
         }
+    }
+
+    private var birthDateString: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: birthDate)
     }
 
     private func commaSeparatedValues(_ text: String) -> [String] {

@@ -33,23 +33,26 @@ struct OrganizationsView: View {
     var body: some View {
         NavigationStack {
             List {
-                if loading { ProgressView() }
+                if loading { ProgressView("Ищем организации…").frame(maxWidth: .infinity).padding() }
                 if let error { Text(error).foregroundStyle(.red); Button("Повторить") { Task { await load() } } }
                 let results = organizations.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || $0.region.localizedCaseInsensitiveContains(search) }
                 if results.isEmpty && !loading && error == nil {
-                    Text("Подтверждённых организаций пока не найдено.").foregroundStyle(.secondary)
+                    ContentUnavailableView(search.isEmpty ? "Организаций пока нет" : "Ничего не найдено", systemImage: "building.2.crop.circle", description: Text(search.isEmpty ? "Здесь появятся организации, подтверждённые Spark." : "Попробуй другое название или регион."))
+                        .listRowBackground(Color.clear)
                 }
                 ForEach(results) { organization in
                     NavigationLink {
                         OrganizationDetailsView(id: organization.id, token: token)
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
-                            Label(organization.name, systemImage: "building.2")
+                            Label(organization.name, systemImage: "building.2.fill").font(.headline)
+                                .foregroundStyle(.primaryLitePurple)
                             if !organization.region.isEmpty { Text(organization.region).font(.caption).foregroundStyle(.secondary) }
                         }
                     }
                 }
             }
+            .listStyle(.insetGrouped)
             .navigationTitle("Организации")
             .searchable(text: $search, prompt: "Название или регион")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Готово") { dismiss() } } }

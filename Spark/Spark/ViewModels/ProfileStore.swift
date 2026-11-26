@@ -113,6 +113,7 @@ final class ProfileStore {
 
     func updateProfile(
         name: String,
+        birthDate: String?,
         region: String,
         bio: String,
         skills: [String],
@@ -125,6 +126,7 @@ final class ProfileStore {
                 method: "PATCH",
                 body: ProfileUpdateRequest(
                     name: name,
+                    birthDate: birthDate,
                     region: region,
                     bio: bio,
                     skills: skills,

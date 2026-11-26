@@ -274,6 +274,7 @@ class ProfileResponse(BaseModel):
     id: uuid.UUID
     email: EmailStr
     name: str
+    birth_date: date | None = None
     username: str | None = None
     region: str
     bio: str
@@ -290,11 +291,19 @@ class PortfolioVisibilityUpdate(BaseModel):
 
 
 class ProfileUpdate(BaseModel):
+    birth_date: date | None = None
     name: str | None = Field(default=None, min_length=2, max_length=120)
     region: str | None = Field(default=None, max_length=120)
     bio: str | None = Field(default=None, max_length=1000)
     skills: list[str] | None = Field(default=None, max_length=30)
     interests: list[str] | None = Field(default=None, max_length=30)
+
+    @field_validator("birth_date")
+    @classmethod
+    def validate_birth_date(cls, value: date | None) -> date | None:
+        if value is not None and (value > date.today() or value.year < 1900):
+            raise ValueError("Invalid birth date")
+        return value
 
 
 class OrganizationProfileUpdate(BaseModel):

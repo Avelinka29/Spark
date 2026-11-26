@@ -6,6 +6,7 @@ struct ProjectView: View {
     var profile: UserProfile? = nil
     var onCreateProject: () -> Void = {}
     @State private var showAIConfirmation = false
+    @State private var selectedSection = 0
 
     private var recommendations: [ProjectRecommendation] {
         ProjectRecommendations.matching(projects: store.projects, profile: profile)
@@ -21,7 +22,16 @@ struct ProjectView: View {
                         onCreate: onCreateProject
                     )
 
-                    if profile != nil {
+                    Picker("Раздел проектов", selection: $selectedSection) {
+                        Text("Все").tag(0)
+                        Text("Для меня").tag(1)
+                        Text("Отклики").tag(2)
+                    }.pickerStyle(.segmented)
+
+                    if selectedSection == 1 && profile != nil {
+                        Text("Подбор для тебя").font(.title2.bold())
+                        Text("Проекты по твоим навыкам и интересам. Проверь роль перед откликом.")
+                            .font(.subheadline).foregroundStyle(.secondary)
                         Button {
                             showAIConfirmation = true
                         } label: {
@@ -64,7 +74,7 @@ struct ProjectView: View {
                         }
                     }
 
-                    if !recommendations.isEmpty {
+                    if selectedSection == 1 && !recommendations.isEmpty {
                         Text("Совпадения по профилю")
                             .font(.title3.bold())
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -76,30 +86,36 @@ struct ProjectView: View {
                             }
                             .buttonStyle(.plain)
                         }
-                    } else if profile != nil && profile?.skills.isEmpty == true && profile?.interests.isEmpty == true {
+                    } else if selectedSection == 1 && profile != nil && profile?.skills.isEmpty == true && profile?.interests.isEmpty == true {
                         Text("Добавь навыки и интересы в профиле, чтобы увидеть подходящие проекты.")
                             .font(.subheadline).foregroundStyle(.secondary)
                     }
 
-                    Text("Активные проекты")
+                    if selectedSection == 1 && profile == nil {
+                        SparkEmptyRow(title: "Войди в аккаунт", detail: "Заполни профиль, чтобы увидеть подходящие проекты.", symbol: "person.crop.circle")
+                    }
+                    if selectedSection == 2 && store.receivedApplications.isEmpty && store.myApplications.isEmpty {
+                        SparkEmptyRow(title: "Откликов пока нет", detail: "Здесь появятся твои отклики и заявки в твои проекты.", symbol: "tray")
+                    }
+                    if selectedSection == 0 { Text("Все проекты")
                         .font(.title3.bold())
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading) }
 
-                    if !store.receivedApplications.isEmpty {
+                    if selectedSection == 2 && !store.receivedApplications.isEmpty {
                         ApplicationInbox(store: store)
                     }
 
-                    if !store.myApplications.isEmpty {
+                    if selectedSection == 2 && !store.myApplications.isEmpty {
                         MyApplications(store: store)
                     }
 
-                    if store.projects.isEmpty && !store.isLoading {
+                    if selectedSection == 0 && store.projects.isEmpty && !store.isLoading {
                         SparkEmptyRow(
                             title: "Проектов пока нет",
                             detail: "Создай первый проект и собери команду.",
                             symbol: "person.3"
                         )
-                    } else {
+                    } else if selectedSection == 0 {
                         ForEach(store.projects) { project in
                             NavigationLink {
                                 ProjectDetailsView(
@@ -111,7 +127,7 @@ struct ProjectView: View {
                                 CardActiveProject(
                                     category: project.category.uppercased(),
                                     color: .litePurple,
-                                    title: project.title,
+                                    title: project.title.replacingOccurrences(of: "[Демо] ", with: "Учебный пример · "),
                                     description: project.summary,
                                     isAuthenticated: store.isAuthenticated,
                                     vacancies: project.vacancies
@@ -168,7 +184,7 @@ private struct RecommendationCard: View {
                 Text(project.category.uppercased())
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.primaryLitePurple)
-                Text(project.title).font(.headline).foregroundStyle(.primary)
+                Text(project.title.replacingOccurrences(of: "[Демо] ", with: "Учебный пример · ")).font(.headline).foregroundStyle(.primary)
                 ForEach(reasons, id: \.self) { reason in
                     Text(reason).font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -252,7 +268,7 @@ private struct ProjectDetailsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(currentProject.category.uppercased())
                         .font(.caption.weight(.bold)).foregroundStyle(.primaryLitePurple)
-                    Text(currentProject.title)
+                    Text(currentProject.title.replacingOccurrences(of: "[Демо] ", with: "Учебный пример · "))
                         .font(.title.bold())
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text(currentProject.summary)

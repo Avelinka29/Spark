@@ -275,6 +275,7 @@ struct ProfileDTO: Decodable {
     let organizationName: String?
     let organizationStatus: String?
     let portfolioPublic: Bool
+    let birthDate: String?
 
     enum CodingKeys: String, CodingKey {
         case id, email, name, username, region, bio, skills, interests
@@ -282,6 +283,7 @@ struct ProfileDTO: Decodable {
         case organizationName = "organization_name"
         case organizationStatus = "organization_status"
         case portfolioPublic = "portfolio_public"
+        case birthDate = "birth_date"
     }
 
     func makeProfile() -> UserProfile {
@@ -296,7 +298,7 @@ struct ProfileDTO: Decodable {
             accountType: accountType,
             organizationName: organizationName,
             organizationStatus: organizationStatus
-            , username: username, portfolioPublic: portfolioPublic
+            , username: username, portfolioPublic: portfolioPublic, birthDate: birthDate
         )
     }
 }
@@ -415,6 +417,19 @@ struct EventProposalDTO: Identifiable, Decodable {
 
 struct ProfileUpdateRequest: Encodable {
     let name: String
+    let birthDate: String?
+
+    enum CodingKeys: String, CodingKey { case name, region, bio, skills, interests; case birthDate = "birth_date" }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(birthDate, forKey: .birthDate)
+        try container.encode(region, forKey: .region)
+        try container.encode(bio, forKey: .bio)
+        try container.encode(skills, forKey: .skills)
+        try container.encode(interests, forKey: .interests)
+    }
     let region: String
     let bio: String
     let skills: [String]

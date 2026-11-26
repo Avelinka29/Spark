@@ -20,6 +20,19 @@ struct HomeView: View {
 
     private let categories = EventCategory.allCases
 
+    private func homeShortcut(_ title: String, subtitle: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                Image(systemName: icon).font(.headline).foregroundStyle(color)
+                    .frame(width: 36, height: 36).background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 11))
+                Text(title).font(.subheadline.bold()).foregroundStyle(.primary)
+                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 105, alignment: .leading)
+            .padding(14).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
+        }.buttonStyle(.plain)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -34,43 +47,23 @@ struct HomeView: View {
 
                 Divider()
 
-                Button { showOrganizations = true } label: {
-                    Label("Найти организацию", systemImage: "building.2")
-                        .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                }.buttonStyle(.plain).padding(.horizontal)
-
-                Button {
-                    if accessToken == nil { showSignInMessage = true } else { showSaved = true }
-                } label: {
-                    Label("Сохранённые события", systemImage: "bookmark")
-                        .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16).background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                }.buttonStyle(.plain).padding(.horizontal)
-
-                Button {
-                    if accessToken == nil { showSignInMessage = true }
-                    else { showSubscriptions = true }
-                } label: {
-                    Label("Подписки и моя лента", systemImage: "bell.badge")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal)
-
-                Button {
-                    if accessToken == nil { showSignInMessage = true }
-                    else { showGoalRoute = true }
-                } label: {
-                    Label("Маршрут к цели", systemImage: "map")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                }.buttonStyle(.plain).padding(.horizontal)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Открой для себя").font(.title3.bold())
+                    Text("Организации, события и твои возможности")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                        homeShortcut("Организации", subtitle: "Найти и подписаться", icon: "building.2", color: .blue) { showOrganizations = true }
+                        homeShortcut("Сохранённое", subtitle: "Твои события", icon: "bookmark", color: .orange) {
+                            if accessToken == nil { showSignInMessage = true } else { showSaved = true }
+                        }
+                        homeShortcut("Подписки", subtitle: "Твоя лента", icon: "bell.badge", color: .purple) {
+                            if accessToken == nil { showSignInMessage = true } else { showSubscriptions = true }
+                        }
+                        homeShortcut("Моя цель", subtitle: "Найти свой путь", icon: "map", color: .mint) {
+                            if accessToken == nil { showSignInMessage = true } else { showGoalRoute = true }
+                        }
+                    }
+                }.padding(.horizontal).padding(.vertical, 12)
 
                 if let accessToken {
                     SubscriptionHighlights(token: accessToken, refreshID: subscriptionRefreshID)
@@ -149,7 +142,7 @@ struct HomeView: View {
             .sheet(isPresented: $showSaved) { if let accessToken { SavedOpportunitiesView(token: accessToken) } }
             .alert("Нужен аккаунт", isPresented: $showSignInMessage) {
                 Button("Понятно", role: .cancel) {}
-            } message: { Text("Войди, чтобы пользоваться подписками и маршрутом к цели.") }
+            } message: { Text("Войди, чтобы сохранять события и пользоваться персональными возможностями.") }
             .task(id: refreshID) {
                 await model.load()
             }

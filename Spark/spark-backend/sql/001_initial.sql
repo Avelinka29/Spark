@@ -10,6 +10,7 @@ CREATE TABLE users (
     email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     name VARCHAR(120) NOT NULL,
     username VARCHAR(32) UNIQUE,
+    birth_date DATE,
     region VARCHAR(120) NOT NULL DEFAULT '',
     bio TEXT NOT NULL DEFAULT '',
     skills VARCHAR[] NOT NULL DEFAULT '{}',
